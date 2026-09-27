@@ -204,11 +204,12 @@
 
 <input type="file" id="fileInput" accept=".prof,.prof.json,.json,application/vnd.professorgest,application/json,text/plain,application/octet-stream" style="display:none">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" async></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async></script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://apis.google.com/js/api.js" async></script>
 <script src="google-drive-config.js"></script>
-<script src="app.js"></script>
+<!-- Em desenvolvimento local, este arquivo opcional sobrescreve apenas as credenciais locais.
+     No artefato publicado ele é sempre substituído por um stub sem segredos. -->
+<script src="google-drive-config.local.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,16 @@
+{
+  "name": "professorgest",
+  "private": true,
+  "version": "2026.09.27.23",
+  "description": "ProfessorGest - aplicativo PWA local-first para organização pedagógica",
+  "scripts": {
+    "test": "node --test",
+    "build:pages": "node scripts/build-pages.mjs",
+    "check": "node --check app.js && node --check src/prof-model.js && node --check src/local-store.js && node --check src/drive-bindings.js && node --check src/file-io.js && node --check src/drive-http.js && node --check src/project-selectors.js && node --check src/ui-navigation.js && node --check src/ui-modal.js && node --check src/save-state.js && node --check src/views-core.js && node --check src/views-students-activities.js && node --check src/views-calendar-occurrences.js && node --check src/views-reports.js && node --check src/views-class.js && node --check src/views-file-settings.js && node --check src/views-welcome.js",
+    "qa": "npm run check && npm run build:pages && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module"
+}

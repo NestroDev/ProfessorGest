@@ -27,6 +27,9 @@ jobs:
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
 
+      - name: Validate application
+        run: npm run qa
+
       - name: Inject Google Drive API key
         env:
           GOOGLE_API_KEY: ${{ secrets.PROFESSORGEST_GOOGLE_API_KEY }}
@@ -54,10 +57,13 @@ jobs:
           path.write_text(text.replace(marker, replacement, 1), encoding='utf-8')
           PY
 
+      - name: Build GitHub Pages artifact
+        run: npm run build:pages
+
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: ./dist
 
       - name: Deploy to GitHub Pages
         id: deployment

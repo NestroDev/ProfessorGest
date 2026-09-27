@@ -1,9 +1,25 @@
-const CACHE_NAME = 'professorgest-shell-v23';
+const CACHE_NAME = 'professorgest-shell-v39';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './src/prof-model.js',
+  './src/local-store.js',
+  './src/drive-bindings.js',
+  './src/file-io.js',
+  './src/drive-http.js',
+  './src/project-selectors.js',
+  './src/ui-navigation.js',
+  './src/ui-modal.js',
+  './src/save-state.js',
+  './src/views-core.js',
+  './src/views-students-activities.js',
+  './src/views-calendar-occurrences.js',
+  './src/views-reports.js',
+  './src/views-class.js',
+  './src/views-file-settings.js',
+  './src/views-welcome.js',
   './google-drive-config.js',
   './logo.svg?v=21',
   './manifest.webmanifest?v=21',
@@ -18,7 +34,6 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -38,8 +53,11 @@ async function networkFirst(request, fallbackPath = null) {
   const cache = await caches.open(CACHE_NAME);
   try {
     const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok) await cache.put(request, response.clone());
-    return response;
+    if (response.ok) {
+      await cache.put(request, response.clone());
+      return response;
+    }
+    return (await cache.match(request)) || (fallbackPath ? await cache.match(fallbackPath) : null) || response;
   } catch (_) {
     return (await cache.match(request)) || (fallbackPath ? await cache.match(fallbackPath) : null) || Response.error();
   }
