@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="book" x1="16" y1="20" x2="48" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF2FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="#0B1B33"/>
+  <rect x="5" y="5" width="54" height="54" rx="15" fill="url(#bg)"/>
+  <path d="M16 22.5C20.6 20.2 25.5 20.8 32 24.1V45c-6.5-3.3-11.4-3.9-16-1.6V22.5Z" fill="url(#book)"/>
+  <path d="M48 22.5C43.4 20.2 38.5 20.8 32 24.1V45c6.5-3.3 11.4-3.9 16-1.6V22.5Z" fill="url(#book)" opacity=".94"/>
+  <path d="M32 24.2V45" stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
+  <path d="M44 14.5l1.2 3.2 3.3 1.2-3.3 1.2-1.2 3.2-1.2-3.2-3.2-1.2 3.2-1.2 1.2-3.2Z" fill="#DCEBFF"/>
+</svg>

@@ -1,0 +1,46 @@
+# =========================
+# Secrets / local configuration
+# =========================
+.env
+.env.*
+!.env.example
+
+# Local Google Drive configuration overrides
+# Keep the public stub in google-drive-config.js; never replace it in a commit
+# with real credentials.
+
+# =========================
+# User data / exports / logs
+# =========================
+*.prof
+*.prof.json
+professorgest-dev-log-*.json
+*.log
+
+# =========================
+# Temporary / backup files
+# =========================
+*.tmp
+*.temp
+*.bak
+*.backup
+*.zip
+*.7z
+
+# =========================
+# OS / editor
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Generated test/deploy output
+# =========================
+dist/
+build/
+_site/
+
+# Local development copy with a real Google API key
+google-drive-config.local.js

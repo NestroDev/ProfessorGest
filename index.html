@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2563EB">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="application-name" content="ProfessorGest">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png?v=21">
+<title>ProfessorGest</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg?v=21">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=21">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="welcome-screen" id="welcomeScreen">
+  <div class="welcome-orb orb-one"></div>
+  <div class="welcome-orb orb-two"></div>
+  <header class="welcome-topbar">
+    <div class="welcome-brand">
+      <img src="logo.svg?v=21" alt="ProfessorGest" class="welcome-logo">
+      <div>
+        <div class="welcome-brand-name">ProfessorGest</div>
+        <div class="welcome-brand-sub">gestão pedagógica</div>
+      </div>
+    </div>
+    <button class="welcome-theme-toggle" id="welcomeThemeToggle" type="button" aria-label="Alternar tema">
+      <span class="theme-icon theme-icon-sun">☀</span>
+      <span class="theme-icon theme-icon-moon">☾</span>
+    </button>
+  </header>
+
+  <main class="welcome-content welcome-content-minimal">
+    <div class="welcome-mark"><img src="logo.svg?v=21" alt=""></div>
+    <div class="welcome-eyebrow">PROFESSORGEST</div>
+    <h1>Seu espaço de trabalho.</h1>
+    <p class="welcome-lead">Escolha como começar.</p>
+
+    <div class="welcome-actions welcome-actions-refined">
+      <button class="welcome-card primary" id="welcomeNewFile" type="button">
+        <span class="welcome-card-icon">+</span>
+        <span class="welcome-card-copy">
+          <strong>Criar novo arquivo</strong>
+          <span>Começar um novo espaço</span>
+        </span>
+        <span class="welcome-card-arrow">→</span>
+      </button>
+      <button class="welcome-card" id="welcomeOpenFile" type="button">
+        <span class="welcome-card-icon folder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7.5A2 2 0 0 1 5 5.5h5l2 2h7a2 2 0 0 1 2 2v7A2 2 0 0 1 19 18.5H5a2 2 0 0 1-2-2z"/><path d="M3.5 10h17"/></svg>
+        </span>
+        <span class="welcome-card-copy">
+          <strong>Abrir arquivo</strong>
+          <span>Continuar um espaço existente</span>
+        </span>
+        <span class="welcome-card-arrow">→</span>
+      </button>
+      <button class="welcome-card demo" id="welcomeDemo" type="button">
+        <span class="welcome-card-icon demo-icon"><span>✦</span></span>
+        <span class="welcome-card-copy">
+          <strong>Explorar demonstração</strong>
+          <span>Ver o ProfessorGest preenchido</span>
+        </span>
+        <span class="welcome-card-arrow">→</span>
+      </button>
+    </div>
+
+    <div class="welcome-drive-action">
+      <button class="welcome-drive-link" id="welcomeDrive" type="button">
+        <span class="welcome-drive-icon">☁</span>
+        <span>Abrir do Google Drive</span>
+      </button>
+      <span>Use o mesmo arquivo no computador e no celular.</span>
+      <button class="welcome-install-link is-hidden" id="welcomeInstall" type="button">
+        <span class="welcome-install-icon">⌄</span>
+        <span>Instalar ProfessorGest</span>
+      </button>
+    </div>
+    <div class="welcome-legal">
+      <span>O ProfessorGest funciona principalmente no seu dispositivo.</span>
+      <span class="welcome-legal-links"><a href="./privacidade.html">Política de Privacidade</a><a href="./termos.html">Termos de Serviço</a></span>
+    </div>
+  </main>
+</div>
+
+<div class="setup-screen is-hidden" id="setupScreen">
+  <div class="setup-orb setup-orb-one"></div>
+  <div class="setup-orb setup-orb-two"></div>
+  <header class="setup-topbar">
+    <div class="welcome-brand">
+      <img src="logo.svg?v=21" alt="ProfessorGest" class="welcome-logo">
+      <div>
+        <div class="welcome-brand-name">ProfessorGest</div>
+        <div class="welcome-brand-sub">primeira abertura</div>
+      </div>
+    </div>
+    <button class="welcome-theme-toggle" id="setupThemeToggle" type="button" aria-label="Alternar tema">
+      <span class="theme-icon theme-icon-sun">☀</span>
+      <span class="theme-icon theme-icon-moon">☾</span>
+    </button>
+  </header>
+
+  <main class="setup-content">
+    <section class="setup-panel">
+      <div class="setup-step">SEU ESPAÇO</div>
+      <h1>Configure seu espaço.</h1>
+      <p class="setup-lead">Esses dados aparecem no seu perfil e nos relatórios.</p>
+
+      <form id="setupForm" class="setup-form">
+        <div class="form-group">
+          <label class="form-label" for="setupTeacherName">Nome do professor(a) <span class="required">*</span></label>
+          <input class="form-input setup-input" id="setupTeacherName" name="teacherName" required autocomplete="name" placeholder="Ex.: Ana Souza">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="setupSchool">Escola / instituição</label>
+            <input class="form-input setup-input" id="setupSchool" name="school" autocomplete="organization" placeholder="Ex.: Escola Municipal Aurora">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="setupSubject">Disciplina / área</label>
+            <input class="form-input setup-input" id="setupSubject" name="subject" placeholder="Ex.: Matemática">
+          </div>
+        </div>
+        <div class="setup-actions">
+          <button type="button" class="btn-secondary" id="setupBackBtn">Voltar</button>
+          <button type="submit" class="btn-primary">Começar no ProfessorGest <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="setup-preview">
+      <div class="setup-preview-label">SEU PERFIL</div>
+      <div class="setup-avatar" id="setupAvatar">P</div>
+      <div class="setup-preview-name" id="setupPreviewName">Seu nome</div>
+      <div class="setup-preview-meta" id="setupPreviewMeta">Professor(a)</div>
+      <div class="setup-preview-divider"></div>
+      <div class="setup-preview-row"><span>Escola</span><strong id="setupPreviewSchool">Não informado</strong></div>
+      <div class="setup-preview-row"><span>Área</span><strong id="setupPreviewSubject">Não informada</strong></div>
+    </aside>
+  </main>
+</div>
+
+<div id="app">
+
+  <!-- Sidebar (desktop) -->
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="brand-logo" src="logo.svg?v=21" alt="">
+      <div class="brand-copy">
+        <span class="brand-name">ProfessorGest</span>
+        <span class="brand-tagline">gestão pedagógica</span>
+      </div>
+    </div>
+    <div class="nav-scroll" id="sidebar-nav"></div>
+    <button class="btn-primary quick-register" id="quickRegisterBtnDesktop">+ Registro rápido</button>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-title-wrap">
+          <div class="topbar-title" id="viewTitle">Dashboard</div>
+          <div class="topbar-save-status" id="topbarSaveStatus"></div>
+        </div>
+      </div>
+      <button class="topbar-search" id="topbarSearchBtn" type="button" aria-label="Busca global (Ctrl+K)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Buscar alunos, turmas, atividades...</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+      <div class="topbar-right">
+        <div class="topbar-save-action" id="topbarSaveAction"></div>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar tema" title="Alternar tema">
+          <span class="theme-icon theme-icon-sun">☀</span>
+          <span class="theme-icon theme-icon-moon">☾</span>
+        </button>
+        <div class="topbar-file" id="topbarFile"></div>
+        <div class="topbar-avatar" id="topbarAvatar">P</div>
+      </div>
+    </header>
+    <main id="viewContainer" class="view-container"></main>
+  </div>
+
+  <!-- Bottom nav (mobile) -->
+  <nav class="bottom-nav" id="bottomNav"></nav>
+
+  <!-- Floating quick register button (mobile) -->
+  <button class="fab" id="quickRegisterBtnMobile" title="Registrar ocorrência" aria-label="Registrar ocorrência">+</button>
+
+  <!-- Modal / Command palette / Toast roots -->
+  <div id="modalRoot"></div>
+  <div id="cmdkRoot"></div>
+  <div class="toast-root" id="toastRoot"></div>
+
+</div>
+
+<input type="file" id="fileInput" accept=".prof,.prof.json,.json,application/vnd.professorgest,application/json,text/plain,application/octet-stream" style="display:none">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://apis.google.com/js/api.js" async></script>
+<script src="google-drive-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

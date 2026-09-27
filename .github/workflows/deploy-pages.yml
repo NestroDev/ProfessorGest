@@ -1,0 +1,64 @@
+name: Deploy ProfessorGest to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Inject Google Drive API key
+        env:
+          GOOGLE_API_KEY: ${{ secrets.PROFESSORGEST_GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "Missing required secret: PROFESSORGEST_GOOGLE_API_KEY" >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import json
+
+          path = Path('google-drive-config.js')
+          text = path.read_text(encoding='utf-8')
+          key = os.environ['GOOGLE_API_KEY']
+          encoded = json.dumps(key, ensure_ascii=False)
+
+          marker = "  apiKey: '',"
+          replacement = f"  apiKey: {encoded},"
+          if marker not in text:
+              raise SystemExit('The expected public Google Drive config stub was not found.')
+
+          path.write_text(text.replace(marker, replacement, 1), encoding='utf-8')
+          PY
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

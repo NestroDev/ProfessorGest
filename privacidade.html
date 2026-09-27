@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2563EB">
+<title>Política de Privacidade — ProfessorGest</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg?v=21">
+<style>
+:root{--primary:#2563EB;--primary-dark:#1D4ED8;--bg:#F4F7FC;--card:#fff;--text:#182233;--muted:#5F6B7A;--border:#E5E8EE;--soft:#EFF6FF;}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased}.wrap{width:min(920px,calc(100% - 32px));margin:0 auto;padding:34px 0 56px}.top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}.brand img{width:42px;height:42px}.brand strong{display:block;font-size:18px}.brand span{display:block;font-size:12px;color:var(--muted)}.back{color:var(--primary);font-weight:700;text-decoration:none}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:32px;box-shadow:0 10px 30px rgba(12,32,54,.07)}h1{margin:0 0 8px;font-size:32px;line-height:1.2;color:var(--primary-dark)}.updated{margin:0 0 28px;color:var(--muted);font-size:13px}h2{margin:28px 0 10px;font-size:20px;color:var(--primary-dark)}p{margin:0 0 14px}ul{margin:8px 0 16px 22px;padding:0}li{margin:6px 0}.notice{background:var(--soft);border:1px solid #BFDBFE;border-radius:12px;padding:14px 16px;margin:18px 0}.footer{margin-top:18px;color:var(--muted);font-size:12px;text-align:center}.links{display:flex;gap:14px;flex-wrap:wrap;margin-top:28px;padding-top:20px;border-top:1px solid var(--border)}.links a{color:var(--primary);font-weight:700;text-decoration:none}@media(max-width:640px){.wrap{width:min(100% - 20px,920px);padding-top:18px}.card{padding:22px 18px}h1{font-size:27px}.top{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="brand" href="./"><img src="logo.svg?v=21" alt="ProfessorGest"><span><strong>ProfessorGest</strong><span>gestão pedagógica</span></span></a>
+    <a class="back" href="./">Voltar ao aplicativo</a>
+  </div>
+  <main class="card">
+    <h1>Política de Privacidade</h1>
+    <p class="updated">Última atualização: 27 de setembro de 2026</p>
+
+    <p>Esta Política de Privacidade descreve como o ProfessorGest trata informações quando você utiliza o aplicativo web para organizar turmas, alunos, atividades, ocorrências e relatórios pedagógicos.</p>
+
+    <div class="notice"><strong>Resumo:</strong> o ProfessorGest funciona prioritariamente no seu dispositivo. Não exige cadastro próprio nem mantém um servidor do ProfessorGest para armazenar os seus projetos. A integração com o Google Drive é opcional e só é utilizada quando você escolhe autorizá-la.</div>
+
+    <h2>1. Quais informações podem ser armazenadas</h2>
+    <p>Quando você utiliza o ProfessorGest, pode inserir e armazenar localmente no seu dispositivo informações como:</p>
+    <ul>
+      <li>nome do professor, escola ou instituição e disciplina/área;</li>
+      <li>nomes de turmas e alunos;</li>
+      <li>atividades, datas, descrições e registros de entrega;</li>
+      <li>ocorrências, observações pedagógicas e anotações associadas aos alunos;</li>
+      <li>dados técnicos necessários para salvar e reabrir o projeto no mesmo dispositivo, como nome do arquivo e preferências do aplicativo.</li>
+    </ul>
+
+    <h2>2. Armazenamento no dispositivo</h2>
+    <p>Os projetos podem ser mantidos no armazenamento local do navegador, incluindo IndexedDB e armazenamento local do navegador. A cópia de recuperação automática também é mantida localmente para ajudar a evitar perda de trabalho.</p>
+    <p>O ProfessorGest também pode criar arquivos <code>.prof</code> para exportação e abertura manual. Esses arquivos são controlados por você e podem conter todos os dados do seu projeto.</p>
+
+    <h2>3. Google Drive e dados obtidos do Google</h2>
+    <p>A integração com o Google Drive é opcional. Quando você escolhe abrir ou salvar um projeto no Google Drive, o ProfessorGest utiliza a autorização do Google e, na configuração atual, solicita o escopo <code>https://www.googleapis.com/auth/drive.file</code>.</p>
+    <p>Nessa situação, o aplicativo pode:</p>
+    <ul>
+      <li>permitir que você selecione, no seu próprio Google Drive, um arquivo de projeto usado pelo ProfessorGest;</li>
+      <li>ler o conteúdo do arquivo selecionado para abrir o projeto;</li>
+      <li>criar um novo arquivo de projeto no seu Google Drive quando você escolher salvá-lo ali;</li>
+      <li>atualizar o arquivo de projeto vinculado quando você solicitar a sincronização.</li>
+    </ul>
+    <p>O conteúdo do projeto é enviado ao Google Drive somente como parte dessas ações solicitadas por você ou da sincronização automática do arquivo já vinculado ao projeto. O ProfessorGest não utiliza os dados do Google Drive para publicidade, não os vende e não os utiliza para criação de perfis de publicidade.</p>
+    <p>O token de acesso recebido para a sessão do Google Drive não é gravado no arquivo <code>.prof</code> nem no armazenamento local do aplicativo. O aplicativo mantém localmente apenas os metadados necessários para reconhecer o arquivo vinculado, como identificador, nome, data de alteração e horário da última sincronização.</p>
+
+    <h2>4. Não existe um servidor próprio do ProfessorGest para os projetos</h2>
+    <p>O funcionamento descrito nesta versão não utiliza um backend próprio do ProfessorGest para receber e guardar os projetos dos usuários. O processamento principal acontece no navegador. Quando você usa o Google Drive, a transmissão e o armazenamento em nuvem passam a ocorrer nos serviços do Google, sujeitos às respectivas políticas do Google.</p>
+
+    <h2>5. Diagnóstico de erros</h2>
+    <p>O aplicativo mantém localmente um pequeno registro de erros técnicos para facilitar diagnóstico. Esse registro pode conter informações técnicas do navegador e do dispositivo, versão da aplicação, estado de conexão, endereço de origem/página e o nome do arquivo aberto, além da mensagem técnica do erro. O registro não é enviado automaticamente para um servidor do ProfessorGest. Ele só sai do dispositivo se você optar por exportá-lo.</p>
+
+    <h2>6. Cookies, analytics e publicidade</h2>
+    <p>O código atual do ProfessorGest não implementa cadastro próprio, mecanismo próprio de publicidade ou ferramenta própria de analytics. O site pode carregar recursos de terceiros, como fontes do Google Fonts, e esses provedores podem processar dados técnicos de acesso de acordo com suas próprias políticas.</p>
+
+    <h2>7. Dados de alunos e responsabilidade do usuário</h2>
+    <p>O ProfessorGest permite registrar dados pessoais e observações pedagógicas de alunos, inclusive informações que podem exigir cuidados especiais conforme a legislação aplicável. Você é responsável por utilizar o aplicativo de forma adequada, inserir apenas os dados necessários e observar as bases legais, autorizações, deveres de sigilo e demais requisitos aplicáveis ao seu contexto escolar.</p>
+    <p>Como os projetos podem permanecer apenas no dispositivo ou na conta do Google Drive escolhida por você, é importante proteger o dispositivo, a conta Google e os arquivos exportados contra acesso não autorizado.</p>
+
+    <h2>8. Compartilhamento com terceiros</h2>
+    <p>O ProfessorGest não possui mecanismo próprio para vender ou compartilhar os projetos com terceiros. Quando você opta por utilizar o Google Drive, os dados necessários à operação são processados pelos serviços do Google. Recursos externos carregados pela página, como fontes da web, seguem as políticas dos respectivos provedores.</p>
+
+    <h2>9. Exclusão</h2>
+    <p>Como os projetos são armazenados localmente ou em arquivos sob seu controle, você pode excluir a cópia local pelos mecanismos de armazenamento do navegador, excluir o arquivo <code>.prof</code> exportado no seu dispositivo e remover do Google Drive as cópias que você criou. A exclusão de dados armazenados por terceiros, como o Google, segue as ferramentas e políticas desses terceiros.</p>
+
+    <h2>10. Alterações nesta política</h2>
+    <p>Esta política pode ser atualizada para refletir mudanças no aplicativo, nos serviços integrados ou nas obrigações aplicáveis. A data de atualização será alterada quando uma nova versão for publicada.</p>
+
+    <h2>11. Contato</h2>
+    <p>Para dúvidas ou solicitações relacionadas a privacidade, utilize o canal de contato disponibilizado pelo responsável pelo ProfessorGest na página oficial ou no projeto publicado.</p>
+
+    <div class="links"><a href="./">Página inicial</a><a href="./termos.html">Termos de Serviço</a></div>
+  </main>
+  <div class="footer">ProfessorGest · Política de Privacidade</div>
+</div>
+</body>
+</html>
