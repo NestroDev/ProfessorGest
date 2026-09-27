@@ -7,29 +7,28 @@ export function createReportRenderers(deps) {
 
   function renderRelatoriosHub() {
     return `
-      <div class="page-head"><div><h1>Relatórios</h1><div class="page-sub">Gere relatórios prontos para impressão ou exportação em PDF</div></div></div>
-      <div class="grid grid-2">
-        <div class="card">
-          <div class="list-item-title">Relatório individual do aluno</div>
-          <p class="muted" style="font-size:13px;margin:6px 0 14px;">Resumo, entregas, ocorrências, observações e linha do tempo de um aluno em um período.</p>
-          <button type="button" class="btn-primary" id="btnOpenIndividualConfig">${ICONS.report} Configurar relatório</button>
-        </div>
-        <div class="card">
+      <div class="page-head"><div><h1>Relatórios</h1><div class="page-sub">Escolha o tipo de relatório que você precisa preparar.</div></div></div>
+      <div class="report-hub-grid">
+        <section class="card report-hub-primary">
+          <div class="report-hub-icon">${ICONS.user}</div>
+          <div class="list-item-title">Relatório do aluno</div>
+          <p class="muted">Resumo, atividades, ocorrências, observações e linha do tempo de um aluno.</p>
+          <button type="button" class="btn-primary" id="btnOpenIndividualConfig">${ICONS.report} Gerar relatório do aluno</button>
+        </section>
+        <section class="card report-hub-primary">
+          <div class="report-hub-icon">${ICONS.users}</div>
           <div class="list-item-title">Relatório da turma</div>
-          <p class="muted" style="font-size:13px;margin:6px 0 14px;">Entregas, pendências, participação e ocorrências de uma turma inteira em um período.</p>
-          <button type="button" class="btn-primary" id="btnOpenClassConfig">${ICONS.report} Configurar relatório</button>
-        </div>
-        <div class="card">
-          <div class="list-item-title">Relatório de atividades</div>
-          <p class="muted" style="font-size:13px;margin:6px 0 14px;">Veja a lista de atividades com filtros e imprima ou exporte a visão atual.</p>
-          <button type="button" class="btn-secondary" id="btnGoAtividadesPrint">Abrir atividades</button>
-        </div>
-        <div class="card">
-          <div class="list-item-title">Relatório de ocorrências</div>
-          <p class="muted" style="font-size:13px;margin:6px 0 14px;">Veja o log de ocorrências com filtros e imprima ou exporte a visão atual.</p>
-          <button type="button" class="btn-secondary" id="btnGoOcorrenciasPrint">Abrir ocorrências</button>
-        </div>
+          <p class="muted">Resumo da turma, entregas, pendências e registros de acompanhamento.</p>
+          <button type="button" class="btn-primary" id="btnOpenClassConfig">${ICONS.report} Gerar relatório da turma</button>
+        </section>
       </div>
+      <section class="card report-hub-secondary">
+        <div><strong>Outras visões para imprimir</strong><span>Você pode abrir as listas, aplicar filtros e usar a impressão ou exportação disponíveis em cada tela.</span></div>
+        <div class="report-hub-secondary-actions">
+          <button type="button" class="btn-secondary" id="btnGoAtividadesPrint">${ICONS.clipboard} Atividades</button>
+          <button type="button" class="btn-secondary" id="btnGoOcorrenciasPrint">${ICONS.bell} Registros</button>
+        </div>
+      </section>
     `;
   }
 

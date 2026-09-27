@@ -7,6 +7,7 @@ export const MAX_STUDENTS = 10000;
 export const MAX_ACTIVITIES = 10000;
 export const MAX_OCCURRENCES = 50000;
 export const MAX_OBSERVATIONS_PER_STUDENT = 500;
+export const MAX_PLANS = 10000;
 export const MAX_TEXT_LENGTH = 20000;
 export const PROF_MIME = 'application/vnd.professorgest';
 
@@ -91,11 +92,11 @@ export function validateProjectData(input) {
   const warnings = [];
   const details = [];
 
-  if (data.classes.length > MAX_CLASSES || data.students.length > MAX_STUDENTS || data.activities.length > MAX_ACTIVITIES || data.occurrences.length > MAX_OCCURRENCES) {
+  if (data.classes.length > MAX_CLASSES || data.students.length > MAX_STUDENTS || data.activities.length > MAX_ACTIVITIES || data.occurrences.length > MAX_OCCURRENCES || (Array.isArray(data.plans) && data.plans.length > MAX_PLANS)) {
     return { ok: false, error: 'limits' };
   }
 
-  if (!uniqueIds(data.classes) || !uniqueIds(data.students) || !uniqueIds(data.activities) || !uniqueIds(data.occurrences)) {
+  if (!uniqueIds(data.classes) || !uniqueIds(data.students) || !uniqueIds(data.activities) || !uniqueIds(data.occurrences) || (Array.isArray(data.plans) && !uniqueIds(data.plans))) {
     return { ok: false, error: 'integrity' };
   }
 
@@ -190,6 +191,28 @@ export function validateProjectData(input) {
     };
   }).filter(o => studentIds.has(o.studentId));
 
+  const rawPlans = Array.isArray(data.plans) ? data.plans : [];
+  const safePlans = rawPlans.slice(0, MAX_PLANS).map(plan => {
+    const id = String(plan?.id ?? '');
+    const classId = plan?.classId == null || plan.classId === '' ? null : String(plan.classId);
+    if (!isSafeId(id)) {
+      warnings.push(`planejamento ${plan?.title || id}: ID inválido`);
+    }
+    if (classId && !classIds.has(classId)) warnings.push(`planejamento ${plan?.title || id}: turma inexistente`);
+    if (!isValidISODate(plan?.date)) invalidRequiredDates.push(`Planejamento: ${plan?.title || id}`);
+    return {
+      id,
+      classId: classId && classIds.has(classId) ? classId : null,
+      date: String(plan?.date || ''),
+      title: textField(plan?.title, 500),
+      content: textField(plan?.content),
+      objectives: textField(plan?.objectives),
+      methodology: textField(plan?.methodology),
+      resources: textField(plan?.resources),
+      assessment: textField(plan?.assessment),
+    };
+  }).filter(plan => isSafeId(plan.id));
+
   if (invalidRequiredDates.length) {
     details.push(...invalidRequiredDates.slice(0, 8).map(item => item.includes('possui completions inválidos') ? item : `${item} possui data inválida`));
     return { ok: false, error: 'integrity', details, warnings };
@@ -225,6 +248,7 @@ export function validateProjectData(input) {
     students: safeStudents,
     activities: safeActivities,
     occurrences: safeOccurrences,
+    plans: safePlans,
   };
 
   return { ok: true, data: safe, warnings, details };

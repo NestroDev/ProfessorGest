@@ -15,6 +15,7 @@ export function createClassViewRenderers(deps) {
       ${bulk ? `<div class="bulk-bar"><span class="bulk-count">${getCtx().bulkSelected.size} selecionado(s)</span>
         <div class="bulk-bar-actions">
           <button type="button" class="btn-secondary btn-sm" id="btnBulkOccurrence">Registrar ocorrência</button>
+          <button type="button" class="btn-secondary btn-sm" id="btnBulkMoveStudents">${ICONS.move} Mudar de turma</button>
           <button type="button" class="btn-secondary btn-sm" id="btnBulkSelectAll">Selecionar todos</button>
         </div></div>` : ''}
       <div class="card list-card">

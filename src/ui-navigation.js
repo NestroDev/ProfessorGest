@@ -31,11 +31,12 @@ export function createNavigationController({
 
   function mobileMenuDescription(key) {
     const map = {
-      ocorrencias: 'Registros e acompanhamento',
-      calendario: 'Atividades e prazos',
-      relatorios: 'Acompanhamento e documentos',
-      arquivo: 'Abrir, salvar e sincronizar',
-      configuracoes: 'Perfil, aparência e preferências'
+      ocorrencias: 'Acompanhar registros dos alunos',
+      calendario: 'Ver aulas, atividades e prazos',
+      relatorios: 'Gerar e revisar relatórios',
+      arquivo: 'Abrir, salvar, exportar e proteger seus arquivos',
+      planejamento: 'Preparar aulas e registrar conteúdos',
+      configuracoes: 'Perfil, aparência e suporte'
     };
     return map[key] || '';
   }
@@ -95,10 +96,15 @@ export function createNavigationController({
     const school = state?.teacher?.school?.trim() || '';
     const driveConnected = !!driveBindingForCurrentProject();
     const driveLabel = driveConnected ? 'Google Drive conectado' : 'Google Drive disponível';
-    const menuItems = ['calendario', 'relatorios', 'arquivo', 'configuracoes']
-      .map(key => navItems.find(item => item.key === key))
-      .filter(Boolean)
-      .map(mobileMenuButton).join('');
+    const mobileGroups = [
+      { label: 'Aulas', keys: ['planejamento', 'calendario'] },
+      { label: 'Acompanhamento', keys: ['relatorios'] },
+      { label: 'Meu espaço', keys: ['arquivo', 'configuracoes'] },
+    ];
+    const menuItems = mobileGroups.map(group => {
+      const items = group.keys.map(key => navItems.find(item => item.key === key)).filter(Boolean).map(mobileMenuButton).join('');
+      return `<div class="mobile-menu-group"><div class="mobile-menu-section-label">${escapeHtml(group.label)}</div>${items}</div>`;
+    }).join('');
 
     openModal(`
       <div class="mobile-menu-head">
@@ -115,7 +121,6 @@ export function createNavigationController({
         <span class="mobile-menu-sync-dot" aria-hidden="true"></span>
         <span>${escapeHtml(driveLabel)}</span>
       </div>
-      <div class="mobile-menu-section-label">Navegação</div>
       <div class="mobile-menu-list">${menuItems}</div>
     `, false, 'mobile-menu-box');
 

@@ -14,11 +14,20 @@ import {
 } from '../src/prof-model.js';
 import {
   LOCAL_RECOVERY_STORE,
+  LOCAL_BACKUP_STORE,
   LOCAL_DB_NAME,
+  LOCAL_DB_VERSION,
+  MAX_LOCAL_PROJECTS,
   writeRecoveryRecord,
+  writeProjectBackup,
+  readProjectBackups,
   readLatestRecoveryRecord,
   readLocalProjectRecordById,
+  deleteLocalProjectRecord,
+  clearLocalProjectRecords,
   readRecoveryRecordById,
+  clearProjectBackups,
+  clearAllLocalData,
 } from '../src/local-store.js';
 import {
   DRIVE_BINDINGS_KEY,
@@ -35,6 +44,8 @@ const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const cssSource = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
 const swSource = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const welcomeViewSource = fs.readFileSync(path.join(root, 'src', 'views-welcome.js'), 'utf8');
+const localStoreSource = fs.readFileSync(path.join(root, 'src', 'local-store.js'), 'utf8');
 
 function validProject(overrides = {}) {
   return {
@@ -137,12 +148,31 @@ test('vínculo do Drive é indexado por projectId e não pelo nome', () => {
 
 test('camada de armazenamento local está modularizada e usa IndexedDB', () => {
   assert.equal(LOCAL_RECOVERY_STORE, 'recovery');
+  assert.equal(LOCAL_BACKUP_STORE, 'backups');
   assert.equal(LOCAL_DB_NAME, 'professorgest-local-v2');
+  assert.equal(LOCAL_DB_VERSION, 3);
+  assert.equal(MAX_LOCAL_PROJECTS, 4);
   assert.equal(typeof writeRecoveryRecord, 'function');
   assert.equal(typeof readLatestRecoveryRecord, 'function');
   assert.equal(typeof readLocalProjectRecordById, 'function');
   assert.equal(typeof readRecoveryRecordById, 'function');
+  assert.equal(typeof writeProjectBackup, 'function');
+  assert.equal(typeof deleteLocalProjectRecord, 'function');
+  assert.equal(typeof clearProjectBackups, 'function');
+  assert.equal(typeof clearAllLocalData, 'function');
+  assert.equal(typeof clearLocalProjectRecords, 'function');
+  assert.equal(typeof readProjectBackups, 'function');
   assert.match(appSource, /from '\.\/src\/local-store\.js'/);
+});
+
+test('versões locais são tratadas como cache limitado e podem ser limpas sem apagar o .prof', () => {
+  assert.match(localStoreSource, /MAX_LOCAL_PROJECTS = 4/);
+  assert.match(localStoreSource, /await pruneLocalProjectRecords\(\)/);
+  assert.match(localStoreSource, /rows\.slice\(safeKeep\)/);
+  assert.match(localStoreSource, /export async function clearLocalProjectRecords\(\)/);
+  assert.match(appSource, /As versões locais foram removidas/);
+  assert.match(appSource, /Seus arquivos \.prof não foram alterados/);
+  assert.match(appSource, /Limite local: 4 projetos/);
 });
 
 test('CSS possui apenas um tema claro canônico e um dark canônico', () => {
@@ -151,14 +181,93 @@ test('CSS possui apenas um tema claro canônico e um dark canônico', () => {
   assert.match(cssSource, /--primary:#2563EB/);
 });
 
+test('planejamento é opcional e compatível com projetos atuais', () => {
+  const withoutPlans = validateProjectData(validProject());
+  assert.equal(withoutPlans.ok, true);
+  assert.deepEqual(withoutPlans.data.plans, []);
+  const withPlan = validateProjectData(validProject({
+    plans: [{ id: 'plan-1', classId: 'class-1', date: '2026-01-06', title: 'Frações', content: 'Conteúdo', objectives: 'Objetivo', methodology: 'Metodologia', resources: 'Livro', assessment: 'Exercícios' }]
+  }));
+  assert.equal(withPlan.ok, true);
+  assert.equal(withPlan.data.plans[0].title, 'Frações');
+  assert.equal(typeof import.meta.url, 'string');
+});
+
+test('recursos novos estão conectados ao aplicativo', () => {
+  assert.match(appSource, /createPlanningViewRenderer/);
+  assert.match(appSource, /openMoveStudentModal/);
+  assert.match(appSource, /writeProjectBackup/);
+  assert.match(appSource, /classSearchInput/);
+  assert.match(appSource, /activitySearchInput/);
+  assert.match(cssSource, /planning-card/);
+});
+
 test('PDF é carregado sob demanda', () => {
   assert.doesNotMatch(htmlSource, /html2canvas\/1\.4\.1\/html2canvas\.min\.js/);
   assert.doesNotMatch(htmlSource, /jspdf\/2\.5\.1\/jspdf\.umd\.min\.js/);
   assert.match(appSource, /ensurePdfLibraries\(\)/);
 });
 
+test('overlays de erro ficam fora do app para funcionar na tela inicial', () => {
+  const appStart = htmlSource.indexOf('<div id="app">');
+  const overlaysStart = htmlSource.indexOf('<!-- UI overlays remain outside #app');
+  const modalIndex = htmlSource.indexOf('id="modalRoot"', overlaysStart);
+  const cmdkIndex = htmlSource.indexOf('id="cmdkRoot"', overlaysStart);
+  const toastIndex = htmlSource.indexOf('id="toastRoot"', overlaysStart);
+  assert.ok(appStart >= 0);
+  assert.ok(overlaysStart > appStart);
+  assert.ok(modalIndex > overlaysStart);
+  assert.ok(cmdkIndex > overlaysStart);
+  assert.ok(toastIndex > overlaysStart);
+});
+
+test('limpeza de cópias possui ação real e invalida o cache local', () => {
+  assert.match(appSource, /id=\"btnClearBackupsModal\"/);
+  assert.match(appSource, /clearProjectBackups\(global \? null : state\?\.projectId/);
+  assert.match(appSource, /projectBackupsCache = \[\];/);
+});
+
+test('limpar todos os dados também redefine o estado em memória e os vínculos locais', () => {
+  assert.match(appSource, /function resetInMemoryAfterLocalDataClear\(\)/);
+  assert.match(appSource, /driveAccessToken = null/);
+  assert.match(appSource, /driveBindingsByProject = \{\}/);
+  assert.match(appSource, /localStorage\.removeItem\('professorgest-theme'\)/);
+  assert.match(appSource, /await showWelcomeScreen\(\)/);
+  assert.match(localStoreSource, /const stores = \[LOCAL_PROJECT_STORE, LOCAL_RECOVERY_STORE, LOCAL_META_STORE, LOCAL_BACKUP_STORE\]/);
+});
+
+test('controles de dados locais e configurações estão disponíveis também na tela inicial', () => {
+  assert.match(htmlSource, /id="welcomeSettings"/);
+  assert.match(htmlSource, /id="welcomeBackups"/);
+  assert.match(appSource, /function openWelcomeSettingsModal\(\)/);
+  assert.match(appSource, /function openLocalDataManager\(\)/);
+  assert.match(appSource, /id="btnClearAllLocalData"/);
+  assert.match(appSource, /id="btnClearAllBackups"/);
+  assert.match(appSource, /id="btnClearAllLocalProjects"/);
+  assert.match(appSource, /clearAllLocalProjectVersions\(\)/);
+  assert.match(appSource, /clearAllLocalData\(\)/);
+});
+
+test('erros ao abrir arquivo são exibidos depois do loading, não escondidos pelo splash', () => {
+  const openStart = appSource.indexOf('async function openFile');
+  const inputStart = appSource.indexOf('async function handleFileOpenInput');
+  assert.ok(openStart >= 0 && inputStart > openStart);
+  const openBlock = appSource.slice(openStart, inputStart);
+  const inputEnd = appSource.indexOf('function profDownloadName', inputStart);
+  const inputBlock = appSource.slice(inputStart, inputEnd);
+
+  for (const block of [openBlock, inputBlock]) {
+    const loadingIndex = block.indexOf("await withAppLoading('Abrindo seu arquivo...'");
+    const errorIndex = block.indexOf('if (openError) showFileErrorModal(openError.message');
+    assert.ok(loadingIndex >= 0);
+    assert.ok(errorIndex > loadingIndex);
+    const callbackScoped = block.slice(loadingIndex, errorIndex);
+    assert.doesNotMatch(callbackScoped, /showFileErrorModal\(/);
+  }
+});
+
 test('service worker inclui os módulos e não ativa atualização durante install', () => {
-  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v39'/);
+  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v45'/);
   assert.match(swSource, /\.\/src\/prof-model\.js/);
   assert.match(swSource, /\.\/src\/local-store\.js/);
   assert.match(swSource, /\.\/src\/file-io\.js/);
@@ -466,4 +575,85 @@ test('cartão Criar novo arquivo não interpola background durante hover', () =>
   assert.match(cssSource, /\.welcome-card\.primary:hover\{background:linear-gradient/);
   assert.doesNotMatch(cssSource, /\.welcome-card\{[^}]*transition:[^}]*background/);
   assert.match(cssSource, /\.welcome-card\.primary,\.welcome-card\.primary:hover\{color:#fff/);
+});
+
+test('polimento de Arquivos preserva todas as ações de arquivo', () => {
+  const view = fs.readFileSync(path.join(root, 'src', 'views-file-settings.js'), 'utf8');
+  for (const id of ['btnOpenFile','btnSaveFile','btnOpenBackups','btnDriveOpen','btnDriveAction','btnExportProf','btnShareProf','btnExportCsv','btnImportCsv']) {
+    assert.match(view, new RegExp(`id="${id}"`), `Ação ausente na tela de Arquivos: ${id}`);
+  }
+  assert.match(view, /btnGoFileFromSettings/);
+});
+
+test('reforma de aluno preserva ações individuais', () => {
+  const view = fs.readFileSync(path.join(root, 'src', 'views-students-activities.js'), 'utf8');
+  assert.match(view, /id="btnRegisterForStudent"/);
+  assert.match(view, /id="btnStudentActions"/);
+  assert.match(appSource, /function openStudentActionsModal/);
+  assert.match(appSource, /studentActionMove/);
+  assert.match(appSource, /studentActionReport/);
+});
+
+test('busca global inclui planejamento sem remover alunos, turmas e atividades', () => {
+  assert.match(appSource, /data-cmdk-student/);
+  assert.match(appSource, /data-cmdk-class/);
+  assert.match(appSource, /data-cmdk-activity/);
+  assert.match(appSource, /data-cmdk-plan/);
+});
+
+test('navegação reorganizada mantém todas as áreas do aplicativo', () => {
+  for (const key of ['dashboard','turmas','alunos','atividades','planejamento','calendario','ocorrencias','relatorios','arquivo','configuracoes']) {
+    assert.match(appSource, new RegExp(`key: '${key}'`), `Área ausente da navegação: ${key}`);
+  }
+});
+
+test('tela inicial separa recuperação, projeto local e outros projetos sem repetir o mesmo estado e limita o apoio local', () => {
+  assert.match(welcomeViewSource, /Recuperação disponível/);
+  assert.match(welcomeViewSource, /alterações protegidas/);
+  assert.match(welcomeViewSource, /Último projeto neste dispositivo/);
+  assert.match(welcomeViewSource, /readLocalProjectRecords/);
+  assert.match(welcomeViewSource, /sameProject/);
+  assert.match(welcomeViewSource, /Abrir versão salva/);
+  assert.match(welcomeViewSource, /Continuar com a recuperação/);
+  assert.match(welcomeViewSource, /Projetos neste dispositivo/);
+  assert.match(welcomeViewSource, /restorePersistedProjectById/);
+  assert.match(welcomeViewSource, /readLocalProjectRecords\(4\)/);
+  assert.match(welcomeViewSource, /\.slice\(0, 3\)/);
+  assert.match(welcomeViewSource, /Até 4 cópias locais de apoio/);
+  assert.match(welcomeViewSource, /featuredProjectId/);
+  assert.match(welcomeViewSource, /\.slice\(0, 3\)/);
+});
+
+test('tela inicial não duplica o acesso aos dados locais no cartão de trabalho recente', () => {
+  assert.doesNotMatch(welcomeViewSource, /Gerenciar dados deste dispositivo/);
+  assert.doesNotMatch(appSource, /welcomeManageData/);
+  assert.match(htmlSource, /id="welcomeSettings"/);
+  assert.match(appSource, /id="btnOpenLocalDataManager"/);
+});
+
+test('configurações da tela inicial troca o tema sem fechar e reabrir o modal', () => {
+  const start = appSource.indexOf('function openWelcomeSettingsModal()');
+  const end = appSource.indexOf('async function showWelcomeScreen', start);
+  const block = appSource.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(block, /applyThemeMode\(nextMode\)/);
+  assert.match(block, /classList\.toggle\('active', active\)/);
+  assert.match(block, /aria-pressed/);
+  assert.doesNotMatch(block, /closeModal\(\);\n\s*openWelcomeSettingsModal\(\)/);
+});
+
+test('tela inicial tem uma única rotina de preparação por chamada', () => {
+  const start = appSource.indexOf('async function showWelcomeScreen');
+  const end = appSource.indexOf('function showSetupScreen', start);
+  const block = appSource.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.equal(block.split("document.getElementById('welcomeScreen')?.classList.remove('is-hidden')").length - 1, 1);
+  assert.equal((block.match(/hydrateRecoveryCache\(\)\.then\(\(\) => renderWelcomeRecovery\(\)\)/g) || []).length, 1);
+});
+
+test('cópias de segurança permanecem acessíveis mesmo quando ainda não existem', () => {
+  assert.match(htmlSource, /<button class="welcome-secondary-action" id="welcomeBackups"/);
+  assert.match(appSource, /button\.classList\.remove\('is-hidden'\)/);
+  assert.match(appSource, /Ainda não há cópias de segurança/);
+  assert.match(appSource, /welcomeBackups.*addEventListener\('click', \(\) => openBackupsModal\(\{ global: true \}\)\)/);
 });

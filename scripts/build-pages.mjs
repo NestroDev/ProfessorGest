@@ -41,23 +41,17 @@ const modules = [
   'views-class.js',
   'views-file-settings.js',
   'views-welcome.js',
+  'views-planning.js',
 ];
 
 for (const file of files) {
   await cp(join(root, file), join(dist, file));
 }
 
-// O código publicado sempre recebe um arquivo local de configuração sem
-// credenciais. Durante o desenvolvimento, se existir um override ignorado
-// pelo Git, ele acompanha apenas o build local.
-const localConfig = join(root, 'google-drive-config.local.js');
+// O artefato de publicação nunca leva credenciais ou overrides locais.
+// A configuração segura de exemplo é a única enviada ao GitHub Pages.
 const localConfigFallback = join(root, 'config', 'google-drive-config.local.stub.js');
-try {
-  await access(localConfig);
-  await cp(localConfig, join(dist, 'google-drive-config.local.js'));
-} catch (_) {
-  await cp(localConfigFallback, join(dist, 'google-drive-config.local.js'));
-}
+await cp(localConfigFallback, join(dist, 'google-drive-config.local.js'));
 
 for (const file of modules) {
   await cp(join(root, 'src', file), join(dist, 'src', file));

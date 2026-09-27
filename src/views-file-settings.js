@@ -2,7 +2,7 @@ export function createFileSettingsRenderers(deps) {
   const {
     getState, esc, getDemoMode, getCurrentFileName, getIsDirty, ICONS,
     supportsFileShare, driveStatusTone, driveStatusText, driveBindingForCurrentProject,
-    fmtDate, fmtDateTime, getThemeMode, getDevLogEntries
+    fmtDate, fmtDateTime, getThemeMode, getDevLogEntries, getProjectBackups = () => []
   } = deps;
 
   function renderArquivo() {
@@ -21,46 +21,54 @@ export function createFileSettingsRenderers(deps) {
         </div>
       `;
     }
+    const backups = getProjectBackups();
     return `
-      <div class="page-head"><div><h1>Arquivo</h1><div class="page-sub">Gerencie seu projeto local e seus arquivos .prof.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnNewFile">${ICONS.file} Novo arquivo</button></div></div>
-      <div class="card" style="max-width:480px;">
-        <div class="section-title" style="margin-top:0;">Arquivo atual</div>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:7px;">
-          ${ICONS.file}${getCurrentFileName() ? `<strong style="color:var(--text);">${esc(getCurrentFileName())}</strong>` : 'Novo projeto em branco — ainda não salvo.'}
-        </p>
-        <p class="topbar-status ${getIsDirty() ? 'dirty' : 'saved'}" style="margin-bottom:18px;font-size:12px;">
-          <span class="status-dot"></span>${getIsDirty() ? 'Alterações não salvas' : 'Tudo salvo'}
-        </p>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <button type="button" class="btn-secondary btn-block" id="btnOpenFile">${ICONS.folder} Abrir arquivo (.prof)</button>
-          <button type="button" class="btn-primary btn-block" id="btnSaveFile">${ICONS.save} Salvar alterações</button>
-          <button type="button" class="btn-secondary btn-block" id="btnExportProf">${ICONS.file} Exportar cópia .prof</button>
-          <button type="button" class="btn-secondary btn-block" id="btnShareProf" ${supportsFileShare() ? '' : 'hidden'}>${ICONS.share || ICONS.copy} Compartilhar .prof</button>
-          <button type="button" class="btn-secondary btn-block" id="btnExportCsv">${ICONS.copy} Exportar alunos (CSV)</button>
-          <button type="button" class="btn-secondary btn-block" id="btnImportCsv">${ICONS.folder} Importar alunos (CSV)</button>
-        </div>
+      <div class="page-head"><div><h1>Arquivos</h1><div class="page-sub">Abra, salve e proteja seu trabalho.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnNewFile">${ICONS.file} Novo arquivo</button></div></div>
 
-        <div class="drive-card ${driveStatusTone()}">
-          <div class="drive-card-head">
-            <div class="drive-card-icon">${ICONS.cloud}</div>
-            <div><strong>Google Drive</strong><span>${esc(driveStatusText())}</span></div>
+      <section class="file-workspace card">
+        <div class="file-workspace-head">
+          <div>
+            <div class="eyebrow">ARQUIVO ATUAL</div>
+            <div class="file-current-name">${ICONS.file}${getCurrentFileName() ? `<strong>${esc(getCurrentFileName())}</strong>` : '<strong>Novo projeto</strong>'}</div>
+            <div class="file-current-status ${getIsDirty() ? 'dirty' : 'saved'}"><span class="status-dot"></span>${getIsDirty() ? 'Alterações não salvas' : 'Tudo salvo'}</div>
           </div>
-          <p>Use o mesmo arquivo no PC e no celular, sem trocar arquivos manualmente.</p>
-          <div class="drive-card-actions">
+          <div class="file-primary-actions">
+            <button type="button" class="btn-secondary" id="btnOpenFile">${ICONS.folder} Abrir arquivo</button>
+            <button type="button" class="btn-primary" id="btnSaveFile">${ICONS.save} Salvar</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="file-tools-grid">
+        <section class="card file-tool-card">
+          <div class="file-tool-icon">${ICONS.save}</div>
+          <div class="file-tool-copy"><strong>Cópias de segurança</strong><span>${backups.length ? `Última cópia: ${fmtDateTime(backups[0].savedAt)}` : 'Proteção automática ativada'}</span><p>O ProfessorGest guarda cópias recentes neste dispositivo para ajudar a recuperar seu trabalho.</p></div>
+          <button type="button" class="btn-secondary" id="btnOpenBackups">${ICONS.folder} Ver cópias</button>
+        </section>
+
+        <section class="card file-tool-card ${driveStatusTone()}">
+          <div class="file-tool-icon">${ICONS.cloud}</div>
+          <div class="file-tool-copy"><strong>Google Drive</strong><span>${esc(driveStatusText())}</span><p>Use o mesmo projeto no computador e no celular.</p></div>
+          <div class="file-tool-actions">
             <button type="button" class="btn-secondary" id="btnDriveOpen">${ICONS.folder} Abrir do Drive</button>
             <button type="button" class="btn-primary" id="btnDriveAction">${driveBindingForCurrentProject() ? ICONS.cloud + ' Sincronizar agora' : ICONS.save + ' Salvar no Drive'}</button>
             ${driveBindingForCurrentProject() ? '<button type="button" class="btn-ghost" id="btnDriveDisconnect">Desvincular</button>' : ''}
           </div>
-        </div>
-
-        <p style="font-size:11.5px;color:var(--text-muted);margin-top:16px;">
-          No computador, o ProfessorGest pode atualizar diretamente o mesmo arquivo <strong>.prof</strong>.
-          Em navegadores móveis que não permitem escrever de volta no arquivo aberto, as alterações ficam salvas neste dispositivo; use <strong>Exportar cópia .prof</strong> para gerar um arquivo compartilhável.
-        </p>
-        <p style="font-size:11px;color:var(--text-muted);margin-top:10px;">
-          Criado em ${fmtDate(getState().createdAt)} · Última alteração salva em ${fmtDateTime(getState().updatedAt)} · Formato versão ${getState().version || 1}
-        </p>
+        </section>
       </div>
+
+      <details class="file-more-options">
+        <summary><span>Mais opções do arquivo</span><span class="details-hint">Exportar, compartilhar e importar</span></summary>
+        <div class="file-more-grid">
+          <button type="button" class="btn-secondary" id="btnExportProf">${ICONS.file} Exportar cópia .prof</button>
+          <button type="button" class="btn-secondary" id="btnShareProf" ${supportsFileShare() ? '' : 'hidden'}>${ICONS.share || ICONS.copy} Compartilhar .prof</button>
+          <button type="button" class="btn-secondary" id="btnExportCsv">${ICONS.copy} Exportar alunos (CSV)</button>
+          <button type="button" class="btn-secondary" id="btnImportCsv">${ICONS.folder} Importar alunos (CSV)</button>
+        </div>
+        <p class="file-note">Em alguns celulares, o arquivo aberto não pode ser atualizado diretamente. Nesses casos, suas alterações continuam protegidas neste dispositivo; use <strong>Exportar cópia .prof</strong> para gerar o arquivo atualizado.</p>
+      </details>
+
+      <p class="file-meta-line">Criado em ${fmtDate(getState().createdAt)} · Última alteração: ${fmtDateTime(getState().updatedAt)}</p>
       <input type="file" id="csvInput" accept=".csv" style="display:none">
     `;
   }
@@ -88,26 +96,30 @@ export function createFileSettingsRenderers(deps) {
         </section>
 
         <section class="card">
-          <div class="section-title" style="margin-top:0;">Sincronização</div>
-          <p class="form-hint" style="margin-bottom:12px;">O Google Drive é opcional. Quando conectado, o arquivo atual pode ser usado no computador e no celular.</p>
+          <div class="section-title" style="margin-top:0;">Arquivos e sincronização</div>
+          <p class="form-hint" style="margin-bottom:12px;">Abra, salve, faça cópias de segurança e gerencie o Google Drive em um único lugar.</p>
           <div class="drive-settings-status ${driveStatusTone()}">
             <span class="drive-settings-icon">${ICONS.cloud}</span>
-            <div><strong>${esc(driveStatusText())}</strong><span>${driveBindingForCurrentProject() ? `Arquivo: ${esc(driveBindingForCurrentProject().name || getCurrentFileName() || 'Projeto')}` : 'Você pode conectar quando quiser.'}</span></div>
+            <div><strong>${esc(driveStatusText())}</strong><span>${driveBindingForCurrentProject() ? `Projeto: ${esc(driveBindingForCurrentProject().name || getCurrentFileName() || 'Projeto atual')}` : 'Google Drive opcional.'}</span></div>
           </div>
           <div class="form-actions" style="margin-top:14px;">
-            <button type="button" class="btn-secondary" id="btnDriveOpenSettings">${ICONS.folder} Abrir do Drive</button>
-            <button type="button" class="btn-primary" id="btnDriveActionSettings">${driveBindingForCurrentProject() ? ICONS.cloud + ' Sincronizar' : ICONS.save + ' Salvar no Drive'}</button>
+            <button type="button" class="btn-primary" id="btnGoFileFromSettings">${ICONS.folder} Abrir Arquivos</button>
           </div>
-          ${driveBindingForCurrentProject() ? '<button type="button" class="btn-ghost" id="btnDriveDisconnectSettings" style="margin-top:8px;">Desvincular deste projeto</button>' : ''}
         </section>
 
         <section class="card">
-          <div class="section-title" style="margin-top:0;">Diagnóstico técnico</div>
-          <p class="form-hint" style="margin-bottom:12px;">Somente erros JavaScript, falhas de leitura/gravação e problemas de importação/exportação são registrados localmente neste dispositivo. O log não é enviado para um servidor.</p>
-          <p id="devLogSummary" class="form-hint" style="margin-bottom:12px;">${getDevLogEntries().length} erro(s) registrado(s).</p>
+          <div class="section-title" style="margin-top:0;">Dados neste dispositivo</div>
+          <p class="form-hint" style="margin-bottom:12px;">Gerencie recuperação, cópias de segurança e os dados que o ProfessorGest mantém neste navegador.</p>
+          <button type="button" class="btn-secondary" id="btnOpenLocalDataSettings">${ICONS.settings || ICONS.folder} Gerenciar dados deste dispositivo</button>
+        </section>
+
+        <section class="card">
+          <div class="section-title" style="margin-top:0;">Ajuda e suporte</div>
+          <p class="form-hint" style="margin-bottom:12px;">Se algo não funcionar como esperado, o ProfessorGest guarda algumas informações do problema neste dispositivo para ajudar a identificar o que aconteceu. Elas não são enviadas automaticamente.</p>
+          <p id="devLogSummary" class="form-hint" style="margin-bottom:12px;">${getDevLogEntries().length ? `${getDevLogEntries().length} problema(s) registrado(s).` : 'Nenhum problema registrado.'}</p>
           <div class="form-actions">
-            <button type="button" class="btn-secondary" id="btnExportDevLog">${ICONS.file} Baixar log técnico</button>
-            <button type="button" class="btn-ghost" id="btnClearDevLog">Limpar log</button>
+            <button type="button" class="btn-secondary" id="btnExportDevLog">${ICONS.file} Baixar informações para suporte</button>
+            <button type="button" class="btn-ghost" id="btnClearDevLog">Apagar registros</button>
           </div>
         </section>
 

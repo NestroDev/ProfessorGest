@@ -34,7 +34,7 @@ test('funções críticas do app continuam definidas após refatorações', () =
 });
 
 test('service worker contém todos os módulos atuais', () => {
-  assert.match(sw, /CACHE_NAME = 'professorgest-shell-v39'/);
+  assert.match(sw, /CACHE_NAME = 'professorgest-shell-v45'/);
   for (const module of [
     'prof-model', 'local-store', 'drive-bindings', 'file-io', 'drive-http',
     'project-selectors', 'ui-navigation', 'ui-modal', 'save-state', 'views-core', 'views-students-activities', 'views-calendar-occurrences', 'views-reports', 'views-class', 'views-file-settings', 'views-welcome'
@@ -59,7 +59,7 @@ test('pacote possui QA como gate de release', () => {
   assert.match(packageJson.scripts.check, /save-state\.js/);
   const buildMatch = app.match(/const APP_BUILD = '([^']+)'/);
   assert.equal(buildMatch?.[1], packageJson.version);
-  assert.equal(packageJson.version, '2026.09.27.23');
+  assert.equal(packageJson.version, '2026.09.27.31');
   const sourceModules = fs.readdirSync(path.join(root, 'src')).filter(name => name.endsWith('.js'));
   for (const module of sourceModules) {
     assert.match(sw, new RegExp(`\.\/src\/${module.replace('.', '\\.')}`), `Módulo ausente do shell: ${module}`);

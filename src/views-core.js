@@ -20,17 +20,16 @@ export function createCoreViewRenderers(api) {
   setLastAttentionItems(attention);
 
   return `
-    <div class="page-head">
+    <div class="page-head page-head-compact">
       <div><h1>${greeting()}, ${esc((state.teacher && state.teacher.name) || 'Professor(a)')}</h1>
         <div class="page-sub">${activeClasses().length} turma(s) · ${totalAlunos} aluno(s) sob acompanhamento</div></div>
-      <div class="page-actions"><button type="button" class="btn-primary" id="btnQuickRegisterTop">${ICONS.plus} Registro rápido</button></div>
     </div>
 
     <div class="grid grid-4" style="margin-bottom:26px;">
       <div class="card stat-card"><div class="stat-icon">${ICONS.users}</div><div class="stat-value">${activeClasses().length}</div><div class="stat-label">Minhas turmas</div></div>
       <div class="card stat-card"><div class="stat-icon">${ICONS.user}</div><div class="stat-value">${totalAlunos}</div><div class="stat-label">Alunos</div></div>
       <div class="card stat-card"><div class="stat-icon">${ICONS.clipboard}</div><div class="stat-value">${upcoming.length}</div><div class="stat-label">Atividades próximas</div></div>
-      <div class="card stat-card"><div class="stat-icon">${ICONS.alert}</div><div class="stat-value">${pendCount}</div><div class="stat-label">Pendências abertas</div></div>
+      <div class="card stat-card"><div class="stat-icon">${ICONS.alert}</div><div class="stat-value">${pendCount}</div><div class="stat-label">Pendências</div></div>
     </div>
 
     ${(!activeClasses().length && !totalAlunos && !state.activities.length) ? `
@@ -52,7 +51,7 @@ export function createCoreViewRenderers(api) {
         </div>
       </div>
     ` : `
-      <div class="section-title">Atenção</div>
+      <div class="section-title">Para acompanhar</div>
       <div class="card" id="attentionCard">
         ${attention.length ? attention.map((it, i) => `
           <div class="attention-card" data-attention-idx="${esc(i)}">
@@ -107,7 +106,9 @@ export function createCoreViewRenderers(api) {
     const ctx = getCtx();
 
   const showArchived = ctx.showArchivedClasses;
-  const list = showArchived ? state.classes : activeClasses();
+  const search = (ctx.classSearch || '').trim().toLowerCase();
+  const source = showArchived ? state.classes : activeClasses();
+  const list = source.filter(c => !search || c.name.toLowerCase().includes(search));
   return `
     <div class="page-head">
       <div><h1>Turmas</h1><div class="page-sub">${activeClasses().length} turma(s) ativa(s)</div></div>
@@ -115,6 +116,9 @@ export function createCoreViewRenderers(api) {
         <button type="button" class="btn-ghost btn-sm" id="btnToggleArchivedClasses">${showArchived ? 'Ocultar arquivadas' : 'Mostrar arquivadas'}</button>
         <button type="button" class="btn-primary" id="btnNewClass">${ICONS.plus} Nova turma</button>
       </div>
+    </div>
+    <div class="filter-bar">
+      <div class="search-bar" style="max-width:320px;"><input class="form-input input-search" id="classSearchInput" placeholder="Pesquisar turma..." value="${esc(ctx.classSearch || '')}"></div>
     </div>
     <div class="grid grid-3">
       ${list.map(c => {

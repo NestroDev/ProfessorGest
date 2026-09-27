@@ -57,7 +57,7 @@ Arquivos `.prof`, `.prof.json` e logs não devem ser enviados ao repositório.
 
 A partir do formato v3, cada projeto possui `projectId` estável. O nome do arquivo não é usado como identidade do projeto. Vínculos com o Google Drive são indexados por `projectId`.
 
-Arquivos `.prof` são tratados como entrada não confiável: IDs, referências, datas, tipos e limites são validados antes do projeto ser aceito. O recovery principal é mantido em IndexedDB e o armazenamento local preserva projetos por identificador.
+Arquivos `.prof` são tratados como entrada não confiável: IDs, referências, datas, tipos e limites são validados antes do projeto ser aceito. O recovery principal é mantido em IndexedDB e o armazenamento local preserva projetos por identificador. Além da recuperação imediata, o aplicativo mantém cópias de segurança automáticas e recentes do projeto neste dispositivo, permitindo revisão e restauração quando necessário.
 
 O exportador de PDF é carregado somente quando solicitado. O Service Worker não ativa automaticamente uma nova versão enquanto o aplicativo pode estar com alterações locais pendentes.
 

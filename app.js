@@ -3,8 +3,8 @@ import {
   createProjectId, validateAndParseProf, validateProjectData
 } from './src/prof-model.js';
 import {
-  writeLocalProjectRecord, readLocalProjectRecord, deleteRecoveryRecord,
-  writeRecoveryRecord, readLatestRecoveryRecord
+  writeLocalProjectRecord, readLocalProjectRecord, readLocalProjectRecordById, readLocalProjectRecords, deleteLocalProjectRecord, clearLocalProjectRecords, deleteRecoveryRecord,
+  writeRecoveryRecord, readLatestRecoveryRecord, writeProjectBackup, readProjectBackups, readAllProjectBackups, deleteProjectBackup, clearProjectBackups, clearAllLocalData
 } from './src/local-store.js';
 import {
   readDriveBindings, writeDriveBindings, setDriveBinding, removeDriveBinding, getDriveBinding, clearLegacyDriveBinding
@@ -24,6 +24,7 @@ import { createReportRenderers } from './src/views-reports.js';
 import { createFileSettingsRenderers } from './src/views-file-settings.js';
 import { createClassViewRenderers } from './src/views-class.js';
 import { createWelcomeViewRenderer } from './src/views-welcome.js';
+import { createPlanningViewRenderer } from './src/views-planning.js';
 import { studentsOf as selectStudentsOf, occurrencesOf as selectOccurrencesOf, activitiesOf as selectActivitiesOf, classById as selectClassById, studentById as selectStudentById, activeClasses as selectActiveClasses, activeStudents as selectActiveStudents, activeActivities as selectActiveActivities, getDeliveryState as selectDeliveryState, studentStats as selectStudentStats, classStats as selectClassStats, activityStats as selectActivityStats, activityStatus as selectActivityStatus } from './src/project-selectors.js';
 
 /* ==================== ProfessorGest ====================
@@ -31,7 +32,7 @@ import { studentsOf as selectStudentsOf, occurrencesOf as selectOccurrencesOf, a
    através de um arquivo .prof (JSON por dentro).
 ================================================================= */
 
-const APP_BUILD = '2026.09.27.23';
+const APP_BUILD = '2026.09.27.31';
 const DEV_LOG_KEY = 'professorgest-dev-log-v2';
 const DEV_LOG_LEGACY_KEYS = ['professorgest-dev-log-v1'];
 const DEV_LOG_MAX_ENTRIES = 50;
@@ -138,7 +139,7 @@ function exportDevLog() {
     runtime: getDevRuntimeContext(),
     entries
   };
-  const filename = `professorgest-dev-log-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const filename = `professorgest-informacoes-suporte-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   downloadFallback(JSON.stringify(payload, null, 2), filename, 'application/json;charset=utf-8');
 }
 
@@ -173,6 +174,7 @@ let driveAccessToken = null;
 let driveTokenExpiresAt = 0;
 let driveTokenClient = null;
 let driveTokenPromise = null;
+let driveAuthCancelled = false;
 let drivePickerReady = false;
 let driveSyncPromise = null;
 let driveBinding = null;
@@ -186,6 +188,10 @@ let localDraftSaveTimer = null;
 let cloudAutoSyncTimer = null;
 let recoveryDraftTimestamp = null;
 let recoveryWriteToken = 0;
+let automaticBackupTimer = null;
+let automaticBackupInFlight = null;
+let automaticBackupRevision = -1;
+let projectBackupsCache = [];
 let saveUiState = 'idle';
 function setSaveUiState(next) { saveUiState = transitionSaveState(saveUiState, next); return saveUiState; }
 let deferredInstallPrompt = null;
@@ -205,6 +211,8 @@ let ctx = {
   bulkMode: false, bulkSelected: new Set(), bulkContext: null,
   reportStudentId: null, reportFrom: '', reportTo: '', reportOpts: null, reportSynthesis: '',
   classReportId: null, classReportFrom: '', classReportTo: '',
+  classSearch: '', activitySearch: '',
+  planningSearch: '', planningClassFilter: '', planningFrom: '', planningTo: '',
 };
 
 const OCCUR_TYPES = [
@@ -218,21 +226,24 @@ const OCCUR_TYPES = [
 ];
 
 const NAV_GROUPS = [
-  { label: 'Visão geral', items: [
-    { key: 'dashboard', label: 'Dashboard', icon: 'home' },
+  { label: 'Início', items: [
+    { key: 'dashboard', label: 'Início', icon: 'home' },
   ]},
-  { label: 'Acadêmico', items: [
+  { label: 'Pessoas', items: [
     { key: 'turmas', label: 'Turmas', icon: 'users' },
     { key: 'alunos', label: 'Alunos', icon: 'user' },
+  ]},
+  { label: 'Aulas', items: [
     { key: 'atividades', label: 'Atividades', icon: 'clipboard' },
+    { key: 'planejamento', label: 'Planejamento', icon: 'calendar' },
     { key: 'calendario', label: 'Calendário', icon: 'calendar' },
   ]},
-  { label: 'Registros', items: [
-    { key: 'ocorrencias', label: 'Ocorrências', icon: 'bell' },
+  { label: 'Acompanhamento', items: [
+    { key: 'ocorrencias', label: 'Registros', icon: 'bell' },
     { key: 'relatorios', label: 'Relatórios', icon: 'report' },
   ]},
-  { label: 'Sistema', items: [
-    { key: 'arquivo', label: 'Arquivo', icon: 'folder' },
+  { label: 'Meu espaço', items: [
+    { key: 'arquivo', label: 'Arquivos', icon: 'folder' },
     { key: 'configuracoes', label: 'Configurações', icon: 'settings' },
   ]},
 ];
@@ -262,6 +273,7 @@ const ICONS = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
   archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8M10 13h4"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>',
+  move: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h10l-3-3M17 17H7l3 3"/><path d="M17 7v4M7 13v4"/></svg>',
   print: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>',
   pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5M9 15v-3h1.5a1 1 0 010 2H9M13 12v3h1.2a1.4 1.4 0 000-3H13M17 12v3M17 13.3h1.4"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>',
@@ -367,8 +379,8 @@ async function saveLocalProjectSnapshot({ stateData = null, storageMode = curren
   return true;
 }
 
-async function restorePersistedProject() {
-  const record = await readLocalProjectRecord();
+async function restorePersistedProjectById(projectId) {
+  const record = await readLocalProjectRecordById(projectId);
   if (!record?.state || record.state.format !== PROF_FORMAT) return false;
 
   if (record.storageMode === 'file' && record.fileHandle) {
@@ -408,6 +420,11 @@ async function restorePersistedProject() {
   return true;
 }
 
+async function restorePersistedProject() {
+  const records = await readLocalProjectRecords(1);
+  return restorePersistedProjectById(records[0]?.state?.projectId || null);
+}
+
 function forgetPersistedProjectOnNewSession() {
   localProjectSaved = false;
   localProjectSavedAt = 0;
@@ -419,6 +436,7 @@ function markDirty() {
   setSaveUiState('dirty');
   if (driveBindingForCurrentProject()) cloudSyncPending = true;
   scheduleLocalRecoveryDraft();
+  scheduleAutomaticBackup();
   scheduleCloudAutoSync();
   updateSaveChrome();
 }
@@ -479,8 +497,141 @@ function scheduleLocalRecoveryDraft() {
   localDraftSaveTimer = setTimeout(() => persistLocalRecoveryDraft(), 550);
 }
 
+function buildAutomaticBackupRecord(reason = 'Proteção automática') {
+  if (!state || demoMode || !workspaceReady || !state.projectId) return null;
+  return {
+    schemaVersion: 1,
+    savedAt: new Date().toISOString(),
+    reason,
+    currentFileName: currentFileName || null,
+    storageMode: currentStorageMode || 'local',
+    fileLastModified: Number(currentFileLastModified) || 0,
+    driveBinding: driveBindingForCurrentProject() || null,
+    state: buildSavePayload(),
+  };
+}
+
+async function createAutomaticBackup(reason = 'Proteção automática', { force = false } = {}) {
+  if (!state || demoMode || !workspaceReady || !state.projectId) return false;
+  if (!force && automaticBackupRevision === dirtyRevision) return true;
+  const record = buildAutomaticBackupRecord(reason);
+  if (!record) return false;
+  if (automaticBackupInFlight) {
+    try { await automaticBackupInFlight; } catch (_) {}
+    if (!force && automaticBackupRevision === dirtyRevision) return true;
+  }
+  automaticBackupInFlight = writeProjectBackup(record, 10).then(ok => {
+    if (ok) {
+      automaticBackupRevision = dirtyRevision;
+      projectBackupsCache = [record, ...projectBackupsCache.filter(item => item?.backupId !== record.backupId)].slice(0, 10);
+      if (state?.projectId === record.state.projectId) {
+        readProjectBackups(record.state.projectId, 10).then(rows => { projectBackupsCache = rows; }).catch(() => {});
+      }
+    }
+    return ok;
+  }).catch(() => false);
+  try { return await automaticBackupInFlight; } finally { automaticBackupInFlight = null; }
+}
+
+function scheduleAutomaticBackup() {
+  clearTimeout(automaticBackupTimer);
+  automaticBackupTimer = setTimeout(() => {
+    if (isDirty) createAutomaticBackup('Proteção automática').catch(() => {});
+  }, 1800);
+}
+
+async function refreshProjectBackups(projectId = state?.projectId) {
+  if (!projectId) { projectBackupsCache = []; return []; }
+  projectBackupsCache = await readProjectBackups(projectId, 10);
+  return projectBackupsCache;
+}
+
+function getProjectBackups() { return projectBackupsCache; }
+
+async function openBackupsModal({ global = false } = {}) {
+  const backups = global ? await readAllProjectBackups(50) : await refreshProjectBackups();
+  const fromWelcome = global;
+  openModal(`
+    <div class="modal-title">Cópias de segurança</div>
+    <p class="confirm-body">O ProfessorGest guarda versões anteriores automaticamente neste dispositivo. Elas servem para recuperar um trabalho sem alterar o arquivo .prof original.</p>
+    <div class="backup-toolbar">
+      <span>${backups.length ? `${backups.length} ${backups.length === 1 ? 'cópia disponível' : 'cópias disponíveis'}` : 'Nenhuma cópia armazenada'}</span>
+      ${backups.length ? '<button type="button" class="btn-ghost btn-sm danger" id="btnClearBackupsModal">Limpar cópias</button>' : ''}
+    </div>
+    <div class="backup-list">
+      ${backups.length ? backups.map((backup, index) => {
+        const teacher = backup.state?.teacher?.name ? ` · ${esc(backup.state.teacher.name)}` : '';
+        const fileName = backup.currentFileName || 'Projeto sem nome';
+        const actionLabel = fromWelcome ? 'Abrir esta cópia' : (index === 0 ? 'Restaurar' : 'Restaurar esta cópia');
+        return `<div class="backup-item">
+          <div><strong>${esc(fileName)}</strong><span>${formatRecoveryTime(backup.savedAt)}${teacher} · Backup automático</span></div>
+          <button type="button" class="btn-secondary btn-sm" data-restore-backup="${esc(backup.backupId || '')}">${actionLabel}</button>
+        </div>`;
+      }).join('') : emptyState('Ainda não há cópias de segurança.', 'Tudo certo: as próximas cópias serão criadas automaticamente enquanto você trabalha em um projeto.')}
+    </div>
+    <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Fechar</button></div>
+  `);
+  projectBackupsCache = backups;
+  qAll('[data-restore-backup]').forEach(button => {
+    button.onclick = () => restoreAutomaticBackup(button.dataset.restoreBackup, { fromWelcome });
+  });
+  onClick('#btnClearBackupsModal', () => {
+    confirmModal({
+      title: `Limpar ${backups.length} ${backups.length === 1 ? 'cópia' : 'cópias'} de segurança?`,
+      body: 'As cópias automáticas armazenadas neste dispositivo serão removidas. Seu arquivo .prof original e o arquivo do Google Drive não serão alterados.',
+      confirmLabel: 'Limpar cópias', danger: true,
+      onConfirm: async () => {
+        const ok = await clearProjectBackups(global ? null : state?.projectId || null);
+        closeModal();
+        if (ok) { projectBackupsCache = []; toast('As cópias de segurança foram removidas.', 'success'); }
+        else toast('Não foi possível limpar as cópias de segurança.', 'error');
+      }
+    });
+  });
+}
+
+async function restoreAutomaticBackup(backupId, { fromWelcome = false } = {}) {
+  const backup = projectBackupsCache.find(item => item.backupId === backupId);
+  if (!backup?.state) return;
+  confirmModal({
+    title: 'Restaurar esta cópia?',
+    body: 'O conteúdo atual será substituído pela cópia escolhida nesta sessão. O original não será sobrescrito automaticamente.',
+    confirmLabel: 'Restaurar',
+    danger: true,
+    onConfirm: async () => {
+      if (state?.projectId && workspaceReady && !demoMode) {
+        await createAutomaticBackup('Antes de restaurar uma cópia', { force: true });
+      }
+      const result = validateProjectData(backup.state);
+      if (!result.ok) { toast('Essa cópia não pôde ser restaurada.', 'error'); return; }
+      state = result.data;
+      demoMode = false;
+      workspaceReady = true;
+      currentFileName = backup.currentFileName || currentFileName || null;
+      currentFileHandle = null;
+      currentStorageMode = 'local';
+      currentFileLastModified = 0;
+      clearDriveBinding();
+      cloudSyncPending = false;
+      resetContext();
+      isDirty = true;
+      dirtyRevision += 1;
+      automaticBackupRevision = -1;
+      await refreshProjectBackups(state.projectId);
+      setSaveUiState('dirty');
+      discardLocalRecoveryDraft();
+      persistLocalRecoveryDraft();
+      closeModal();
+      enterWorkspace();
+      navigate('dashboard');
+      toast(fromWelcome ? 'Cópia aberta. Revise o projeto e salve quando estiver tudo certo.' : 'Cópia restaurada. Revise o projeto e salve quando estiver tudo certo.', 'info');
+    }
+  });
+}
+
 function discardLocalRecoveryDraft() {
   clearTimeout(localDraftSaveTimer);
+  clearTimeout(automaticBackupTimer);
   recoveryWriteToken += 1;
   const projectId = state?.projectId || recoveryDraftCache?.state?.projectId || null;
   if (projectId) deleteRecoveryRecord(projectId);
@@ -612,7 +763,7 @@ function updateSaveChrome() {
   } else if (driveBindingForCurrentProject()) {
     label = 'Sincronizado com Google Drive'; cls = 'synced';
   } else if (currentStorageMode === 'local') {
-    label = 'Salvo neste dispositivo · exporte o .prof para compartilhar'; cls = 'saved';
+    label = 'Salvo neste dispositivo'; cls = 'saved';
   } else if (currentFileName) {
     label = lastLocalSaveAt ? 'Salvo neste dispositivo' : 'Salvo'; cls = 'saved';
   }
@@ -622,8 +773,7 @@ function updateSaveChrome() {
     status.title = label;
   }
   if (action) {
-    const needsPrimaryAction = isDirty || !localProjectSaved || (!currentFileName && currentStorageMode !== 'local') || cloudSyncPending;
-    action.innerHTML = `<button type="button" class="topbar-save-button ${needsPrimaryAction ? 'needs-save' : ''}" id="topbarSaveBtn" ${disabled ? 'disabled' : ''}>${ICONS.save}<span>${buttonLabel}</span></button>`;
+    action.innerHTML = `<button type="button" class="topbar-save-button" id="topbarSaveBtn" ${disabled ? 'disabled' : ''}>${ICONS.save}<span>${buttonLabel}</span></button>`;
     const btn = document.getElementById('topbarSaveBtn');
     if (btn) btn.onclick = savePrimaryAction;
   }
@@ -635,13 +785,29 @@ async function savePrimaryAction() {
   updateSaveChrome();
   try {
     if (driveBindingForCurrentProject() && !currentFileHandle) {
-      await saveCurrentToGoogleDrive({ fromPrimarySave: true });
+      const synced = await saveCurrentToGoogleDrive({ fromPrimarySave: true });
+      if (!synced && driveAuthCancelled) {
+        await saveFile({ fromPrimarySave: true, skipCloudSync: true });
+        toast('Login do Google fechado. As alterações foram salvas neste dispositivo.', 'info');
+        return;
+      }
+      if (!synced) {
+        setSaveUiState('dirty');
+        updateSaveChrome();
+        return;
+      }
     } else {
       await saveFile({ fromPrimarySave: true });
     }
   } catch (err) {
     setSaveUiState('dirty');
     updateSaveChrome();
+    if (driveAuthCancelled) {
+      try {
+        await saveFile({ fromPrimarySave: true, skipCloudSync: true });
+        toast('Login do Google fechado. As alterações foram salvas neste dispositivo.', 'info');
+      } catch (_) {}
+    }
   }
 }
 
@@ -660,8 +826,8 @@ function updateWelcomeExperience(returningUser) {
     if (lead) lead.textContent = 'Abra um arquivo existente ou comece um novo.';
     openFile.querySelector('.welcome-card-copy strong')?.replaceChildren(document.createTextNode('Abrir meu arquivo'));
   } else {
-    if (title) title.textContent = 'Seu espaço de trabalho.';
-    if (lead) lead.textContent = 'Escolha como começar.';
+    if (title) title.textContent = 'Vamos começar.';
+    if (lead) lead.textContent = 'Abra seu arquivo ou crie um novo espaço de trabalho.';
     openFile.querySelector('.welcome-card-copy strong')?.replaceChildren(document.createTextNode('Abrir arquivo'));
   }
 }
@@ -809,6 +975,11 @@ function waitForGoogleIdentity(timeout = 10000) {
   });
 }
 
+function isDriveAuthCancellationError(error) {
+  const message = String(error?.message || error || '');
+  return /popup_closed|cancel|access_denied|interaction_required|login_required|account_selection_required|A autenticação do Google/i.test(message);
+}
+
 function initDriveTokenClient() {
   if (!isGoogleDriveConfigured() || !window.google?.accounts?.oauth2) return false;
   const cfg = googleDriveConfig();
@@ -855,23 +1026,44 @@ async function getDriveAccessToken({ forceConsent = false } = {}) {
   if (driveAccessToken && driveTokenExpiresAt > now + 60000) return driveAccessToken;
   if (driveTokenPromise) return driveTokenPromise;
 
+  driveAuthCancelled = false;
   driveTokenPromise = (async () => {
     await waitForGoogleIdentity();
     if (!initDriveTokenClient()) throw new Error('Google Identity Services não está pronto. Recarregue a página e tente novamente.');
     return await new Promise((resolve, reject) => {
+      let settled = false;
+      const settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        fn(value);
+      };
+      const timeoutId = setTimeout(() => {
+        driveAuthCancelled = true;
+        settle(reject, new Error('A autenticação do Google foi encerrada ou não foi concluída. O arquivo continuará podendo ser salvo neste dispositivo.'));
+      }, 20000);
+
       driveTokenClient.callback = (response) => {
         if (!response || response.error) {
           const detail = response?.error_description || response?.error || 'Não foi possível autorizar o Google Drive.';
-          reject(new Error(detail));
+          const cancelled = isDriveAuthCancellationError(detail);
+          driveAuthCancelled = cancelled;
+          settle(reject, new Error(cancelled
+            ? 'A autenticação do Google foi cancelada. O arquivo continuará podendo ser salvo neste dispositivo.'
+            : detail));
           return;
         }
+        driveAuthCancelled = false;
         driveAccessToken = response.access_token;
         driveTokenExpiresAt = Date.now() + ((Number(response.expires_in) || 3600) * 1000);
-        resolve(driveAccessToken);
+        settle(resolve, driveAccessToken);
       };
       try {
         driveTokenClient.requestAccessToken({ prompt: forceConsent ? 'consent' : '' });
-      } catch (err) { reject(err); }
+      } catch (err) {
+        driveAuthCancelled = true;
+        settle(reject, err);
+      }
     });
   })().finally(() => { driveTokenPromise = null; });
 
@@ -1053,7 +1245,7 @@ function showDriveNotConfigured() {
   openModal(`
     <div class="confirm-icon info">${ICONS.cloud}</div>
     <div class="modal-title">Google Drive ainda não está configurado</div>
-    <p class="confirm-body">A integração precisa de um projeto do Google Cloud configurado para este site. Depois disso, o ProfessorGest poderá abrir e sincronizar arquivos .prof diretamente do Drive.</p>
+    <p class="confirm-body">O Google Drive ainda não está disponível para este site. Você pode continuar salvando seus arquivos neste dispositivo ou exportar uma cópia .prof.</p>
     <div class="cloud-setup-note"><strong>O arquivo continua funcionando normalmente sem isso.</strong><span>Você pode usar arquivos locais enquanto a integração não estiver ativa.</span></div>
     <div class="form-actions"><button type="button" class="btn-primary" id="modalCancel">Entendi</button></div>
   `);
@@ -1081,7 +1273,9 @@ function buildDrivePicker(token) {
       const doc = data.docs?.[0];
       if (!doc?.id) return;
       try {
-        await openDriveFileById(doc.id, doc.name || 'ProfessorGest.prof');
+        await withAppLoading('Abrindo seu arquivo...', async () => {
+          await openDriveFileById(doc.id, doc.name || 'ProfessorGest.prof');
+        });
         toast('Arquivo aberto do Google Drive.', 'success');
       } catch (err) {
         showFileErrorModal(err.message || 'Não foi possível abrir o arquivo do Google Drive.');
@@ -1099,7 +1293,7 @@ function openDrivePicker() {
 
   const showDriveError = (err) => {
     console.error('[ProfessorGest] Google Drive:', err);
-    showFileErrorModal(err?.message || 'Não foi possível conectar ao Google Drive. Verifique as credenciais e as configurações do Google Cloud.');
+    showFileErrorModal(err?.message || 'Não foi possível conectar ao Google Drive. Tente novamente ou continue usando o armazenamento neste dispositivo.');
   };
 
   requestDriveAccessTokenFromClick({
@@ -1230,10 +1424,11 @@ async function saveCurrentToGoogleDrive({ fromPrimarySave = false } = {}) {
     render();
     return true;
   } catch (err) {
+    driveAuthCancelled = isDriveAuthCancellationError(err);
     cloudSyncPending = !!driveBindingForCurrentProject()?.fileId;
     setSaveUiState('dirty');
     updateSaveChrome();
-    toast(err.message || 'Não foi possível salvar no Google Drive.', 'error');
+    if (!driveAuthCancelled) toast(err.message || 'Não foi possível salvar no Google Drive.', 'error');
     return false;
   }
 }
@@ -1262,23 +1457,266 @@ function emptyProjectData() {
   const today = todayISO();
   return {
     format: PROF_FORMAT, version: CURRENT_VERSION, projectId: createProjectId(), createdAt: today, updatedAt: today,
-    teacher: { name: '', school: '', subject: '' }, classes: [], students: [], activities: [], occurrences: [],
+    teacher: { name: '', school: '', subject: '' }, classes: [], students: [], activities: [], occurrences: [], plans: [],
   };
 }
 
-async function showWelcomeScreen() {
-  workspaceReady = false;
+async function resetInMemoryAfterLocalDataClear() {
+  clearTimeout(localDraftSaveTimer);
+  clearTimeout(automaticBackupTimer);
+  clearTimeout(cloudAutoSyncTimer);
+  recoveryWriteToken += 1;
+  state = null;
   demoMode = false;
-  currentStorageMode = 'none';
+  workspaceReady = false;
+  currentFileName = null;
   currentFileHandle = null;
+  currentStorageMode = 'none';
   currentFileLastModified = 0;
+  localProjectSaved = false;
+  localProjectSavedAt = 0;
+  recoveryDraftCache = null;
+  recoveryDraftTimestamp = null;
+  projectBackupsCache = [];
+  automaticBackupRevision = -1;
+  cloudSyncPending = false;
+  driveAccessToken = null;
+  driveTokenExpiresAt = 0;
+  driveTokenClient = null;
+  driveAuthCancelled = false;
   driveBinding = null;
-  document.body.classList.remove('workspace-active');
-  document.getElementById('welcomeScreen')?.classList.remove('is-hidden');
-  document.getElementById('setupScreen')?.classList.add('is-hidden');
-  updateThemeToggle();
-  renderWelcomeRecovery();
-  hydrateRecoveryCache().then(() => renderWelcomeRecovery()).catch(() => {});
+  driveBindingsByProject = {};
+  legacyDriveBindingCandidate = null;
+  lastLocalSaveAt = 0;
+  lastCloudSyncAt = 0;
+  dirtyRevision = 0;
+  isDirty = false;
+  saveUiState = 'idle';
+  try { localStorage.removeItem(LOCAL_RECOVERY_KEY); } catch (_) {}
+  try { localStorage.removeItem(DEV_LOG_KEY); } catch (_) {}
+  try { localStorage.removeItem('professorgest-theme'); } catch (_) {}
+  writeDriveBindings({});
+  clearLegacyDriveBinding();
+  resetContext();
+}
+
+async function clearAllDataAndReturnToWelcome() {
+  const cleared = await clearAllLocalData();
+  if (!cleared) {
+    toast('Não foi possível apagar todos os dados deste dispositivo. Tente novamente.', 'error');
+    return false;
+  }
+  await resetInMemoryAfterLocalDataClear();
+  applyThemeMode('light', false);
+  await showWelcomeScreen();
+  toast('Os dados do ProfessorGest neste dispositivo foram apagados.', 'info');
+  return true;
+}
+
+async function discardSavedLocalProject(projectId) {
+  if (!projectId) return false;
+  const ok = await deleteLocalProjectRecord(projectId);
+  if (!ok) { toast('Não foi possível remover a versão local.', 'error'); return false; }
+  if (state?.projectId === projectId) {
+    localProjectSaved = false;
+    localProjectSavedAt = 0;
+  }
+  await renderWelcomeRecovery();
+  toast('A versão local foi removida. O arquivo .prof original não foi alterado.', 'info');
+  return true;
+}
+
+async function clearAllLocalProjectVersions() {
+  const ok = await clearLocalProjectRecords();
+  if (!ok) {
+    toast('Não foi possível limpar as versões locais.', 'error');
+    return false;
+  }
+  localProjectSaved = false;
+  localProjectSavedAt = 0;
+  await renderWelcomeRecovery();
+  toast('As versões locais foram removidas. Seus arquivos .prof não foram alterados.', 'success');
+  return true;
+}
+
+async function discardRecoveryForProject(projectId) {
+  if (!projectId) return false;
+  const ok = await deleteRecoveryRecord(projectId);
+  try { localStorage.removeItem(LOCAL_RECOVERY_KEY); } catch (_) {}
+  if (!ok) { toast('Não foi possível descartar a recuperação.', 'error'); return false; }
+  if (recoveryDraftCache?.state?.projectId === projectId) {
+    recoveryDraftCache = null;
+    recoveryDraftTimestamp = null;
+  }
+  await renderWelcomeRecovery();
+  toast('A recuperação protegida foi descartada. O arquivo .prof original não foi alterado.', 'info');
+  return true;
+}
+
+async function openLocalDataManager() {
+  const recovery = readLocalRecoveryDraft();
+  let localRecords = [];
+  try { localRecords = await readLocalProjectRecords(4); } catch (_) {}
+  const backups = await readAllProjectBackups(50);
+  const recoveryProjectId = recovery?.state?.projectId || null;
+  const matchingLocal = localRecords.find(record => record?.state?.projectId === recoveryProjectId) || null;
+  const localProjectLabel = record => esc(record?.currentFileName || 'Projeto sem nome');
+
+  openModal(`
+    <div class="modal-title">Dados deste dispositivo</div>
+    <p class="confirm-body">Aqui você controla o que o ProfessorGest mantém neste navegador. O <strong>arquivo .prof</strong> continua sendo a cópia principal do seu trabalho; limpar essas versões locais não apaga seus arquivos.</p>
+
+    <section class="local-data-section">
+      <div class="local-data-section-head"><div><strong>Versões locais</strong><span>Até 4 cópias de apoio para reabrir trabalhos sem substituir seus arquivos .prof.</span></div>${localRecords.length ? '<button type="button" class="btn-ghost btn-sm danger" id="btnClearAllLocalProjects">Limpar versões locais</button>' : ''}</div>
+      ${recovery ? `<div class="local-data-row"><div><strong>Recuperação automática</strong><span>${esc(recovery.currentFileName || 'Projeto sem nome')} · ${formatRecoveryTime(recovery.savedAt)}</span></div><button type="button" class="btn-ghost btn-sm danger" id="btnDiscardRecovery">Descartar</button></div>` : ''}
+      ${localRecords.length ? `<div class="local-data-items">
+          ${localRecords.map(record => {
+            const projectId = record?.state?.projectId || '';
+            const current = projectId === state?.projectId;
+            return `<div class="local-data-row"><div><strong>${localProjectLabel(record)}${current ? ' · atual' : ''}</strong><span>Versão local · ${formatRecoveryTime(record.savedAt)}</span></div><button type="button" class="btn-ghost btn-sm danger" data-discard-local-project="${esc(projectId)}">Remover</button></div>`;
+          }).join('')}
+        </div>
+        ${matchingLocal && recovery ? '<p class="form-hint">A recuperação automática pertence ao mesmo projeto e pode conter alterações mais recentes que a versão local salva.</p>' : ''}
+        ${localRecords.length >= 4 ? '<p class="form-hint">Limite local: 4 projetos. Ao guardar um quinto, o ProfessorGest remove automaticamente a versão local mais antiga. Isso não apaga nenhum arquivo .prof.</p>' : ''}
+      ` : '<div class="local-data-empty">Nenhuma versão local está guardada neste dispositivo.</div>'}
+    </section>
+
+    <section class="local-data-section">
+      <div class="local-data-section-head"><div><strong>Cópias de segurança</strong><span>${backups.length} ${backups.length === 1 ? 'cópia disponível' : 'cópias disponíveis'}</span></div><button type="button" class="btn-secondary btn-sm" id="btnManageBackups">Ver cópias</button></div>
+      ${backups.length ? `<div class="local-data-inline"><span>Proteção automática ativa</span><button type="button" class="btn-ghost btn-sm danger" id="btnClearAllBackups">Limpar todas</button></div>` : '<div class="local-data-empty">As cópias são criadas automaticamente enquanto você trabalha.</div>'}
+    </section>
+
+    <section class="local-data-danger">
+      <div><strong>Apagar todos os dados deste dispositivo</strong><span>Remove versões locais, recuperação, cópias de segurança, vínculos com o Drive, registros de suporte e preferências locais.</span></div>
+      <button type="button" class="btn-danger-solid btn-sm" id="btnClearAllLocalData">Apagar tudo</button>
+    </section>
+
+    <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Fechar</button></div>
+  `);
+
+  onClick('#btnDiscardRecovery', async () => {
+    const projectId = recovery?.state?.projectId;
+    if (!projectId) return;
+    confirmModal({
+      title: 'Descartar recuperação?',
+      body: 'A cópia protegida será removida deste dispositivo. O arquivo .prof original não será alterado.',
+      confirmLabel: 'Descartar recuperação', danger: true,
+      onConfirm: async () => { closeModal(); await discardRecoveryForProject(projectId); }
+    });
+  });
+
+  qAll('[data-discard-local-project]').forEach(button => {
+    button.addEventListener('click', () => {
+      const projectId = button.dataset.discardLocalProject;
+      if (!projectId) return;
+      const record = localRecords.find(item => item?.state?.projectId === projectId);
+      confirmModal({
+        title: 'Remover versão local?',
+        body: `A versão local de ${record?.currentFileName || 'este projeto'} será removida deste dispositivo. O arquivo .prof original e o Google Drive não serão alterados.`,
+        confirmLabel: 'Remover versão', danger: true,
+        onConfirm: async () => { closeModal(); await discardSavedLocalProject(projectId); }
+      });
+    });
+  });
+
+  onClick('#btnClearAllLocalProjects', () => {
+    const count = localRecords.length;
+    confirmModal({
+      title: `Limpar ${count} ${count === 1 ? 'versão local' : 'versões locais'}?`,
+      body: 'As cópias de trabalho locais serão removidas deste dispositivo. Recuperações, backups, arquivos .prof e arquivos do Google Drive não serão alterados.',
+      detailList: [
+        ['Será apagado', `${count} ${count === 1 ? 'versão local' : 'versões locais'} guardadas pelo ProfessorGest`],
+        ['Não será apagado', 'Seus arquivos .prof e arquivos do Google Drive'],
+      ],
+      confirmLabel: 'Limpar versões locais', danger: true,
+      onConfirm: async () => { closeModal(); await clearAllLocalProjectVersions(); }
+    });
+  });
+
+  onClick('#btnManageBackups', () => openBackupsModal({ global: true }));
+  onClick('#btnClearAllBackups', async () => {
+    confirmModal({
+      title: `Limpar ${backups.length} ${backups.length === 1 ? 'cópia' : 'cópias'} de segurança?`,
+      body: 'As cópias automáticas armazenadas neste dispositivo serão removidas. O trabalho atual e os arquivos .prof externos não serão alterados.',
+      confirmLabel: 'Limpar cópias', danger: true,
+      onConfirm: async () => {
+        const ok = await clearProjectBackups();
+        closeModal();
+        if (ok) { projectBackupsCache = []; toast('As cópias de segurança foram removidas.', 'success'); }
+        else toast('Não foi possível limpar as cópias de segurança.', 'error');
+      }
+    });
+  });
+  onClick('#btnClearAllLocalData', () => {
+    confirmModal({
+      title: 'Apagar todos os dados deste dispositivo?',
+      body: 'Esta ação remove permanentemente os dados que o ProfessorGest mantém neste navegador, incluindo alterações não salvas que existam apenas nesta sessão. Ela não apaga arquivos .prof nas suas pastas nem arquivos no Google Drive.',
+      detailList: [
+        ['Será apagado', 'Versões locais, recuperação, cópias de segurança, vínculos do Drive, registros de suporte e preferências'],
+        ['Também pode ser perdido', 'Qualquer alteração ainda não salva que exista apenas no ProfessorGest'],
+        ['Não será apagado', 'Arquivos .prof fora do aplicativo e arquivos no Google Drive'],
+        ['Importante', 'Depois disso, não será possível recuperar essas cópias pelo ProfessorGest'],
+      ],
+      confirmLabel: 'Apagar todos os dados', danger: true,
+      onConfirm: async () => { closeModal(); await clearAllDataAndReturnToWelcome(); }
+    });
+  });
+}
+
+function openWelcomeSettingsModal() {
+  const mode = getThemeMode();
+  openModal(`
+    <div class="modal-title">Configurações</div>
+    <p class="confirm-body">Preferências do aplicativo e dados armazenados neste dispositivo.</p>
+    <section class="local-data-section">
+      <div class="local-data-section-head"><div><strong>Aparência</strong><span>Escolha como o ProfessorGest aparece neste dispositivo.</span></div></div>
+      <div class="theme-setting-grid">
+        <button type="button" class="theme-option ${mode === 'light' ? 'active' : ''}" data-entry-theme-mode="light" aria-pressed="false"><div class="theme-preview light"></div><strong>Claro</strong><span>Visual leve e luminoso.</span></button>
+        <button type="button" class="theme-option ${mode === 'dark' ? 'active' : ''}" data-entry-theme-mode="dark" aria-pressed="false"><div class="theme-preview dark"></div><strong>Escuro</strong><span>Confortável em ambientes com pouca luz.</span></button>
+        <button type="button" class="theme-option ${mode === 'system' ? 'active' : ''}" data-entry-theme-mode="system" aria-pressed="false"><div class="theme-preview system"></div><strong>Sistema</strong><span>Segue a preferência do dispositivo.</span></button>
+      </div>
+    </section>
+    <section class="local-data-section">
+      <div class="local-data-section-head"><div><strong>Dados e cópias</strong><span>Gerencie o que o aplicativo guarda neste dispositivo.</span></div></div>
+      <button type="button" class="btn-secondary btn-block" id="btnOpenLocalDataManager">${ICONS.settings || ICONS.folder} Gerenciar dados deste dispositivo</button>
+    </section>
+    <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Fechar</button></div>
+  `);
+  const syncEntryThemeOptions = activeMode => {
+    qAll('[data-entry-theme-mode]').forEach(option => {
+      const active = option.dataset.entryThemeMode === activeMode;
+      option.classList.toggle('active', active);
+      option.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  };
+  syncEntryThemeOptions(mode);
+  qAll('[data-entry-theme-mode]').forEach(el => el.onclick = () => {
+    const nextMode = el.dataset.entryThemeMode;
+    if (nextMode === getThemeMode()) return;
+    applyThemeMode(nextMode);
+    syncEntryThemeOptions(nextMode);
+  });
+  onClick('#btnOpenLocalDataManager', () => openLocalDataManager());
+}
+
+async function showWelcomeScreen({ withLoading = true } = {}) {
+  const loadingStartedAt = withLoading ? beginAppLoading('Preparando a tela inicial...') : null;
+  try {
+    workspaceReady = false;
+    demoMode = false;
+    currentStorageMode = 'none';
+    currentFileHandle = null;
+    currentFileLastModified = 0;
+    driveBinding = null;
+    document.body.classList.remove('workspace-active');
+    document.getElementById('welcomeScreen')?.classList.remove('is-hidden');
+    document.getElementById('setupScreen')?.classList.add('is-hidden');
+    updateThemeToggle();
+    renderWelcomeRecovery();
+    hydrateRecoveryCache().then(() => renderWelcomeRecovery()).catch(() => {});
+  } finally {
+    if (loadingStartedAt !== null) await finishAppLoading(loadingStartedAt);
+  }
 }
 
 function showSetupScreen(origin = 'welcome') {
@@ -1505,15 +1943,94 @@ function registerPwa() {
 
 /* ==================== boot ==================== */
 
-document.addEventListener('DOMContentLoaded', () => {
-    initTheme();
+const APP_BOOT_MIN_DURATION = 1200;
+
+function setBootStatus(message) {
+  const el = document.getElementById('appBootStatus');
+  if (el) el.textContent = message;
+}
+
+async function waitForMinimumBootDuration(startedAt) {
+  const start = Number(startedAt);
+  if (!Number.isFinite(start)) return;
+
+  const elapsed = performance.now() - start;
+  const remaining = APP_BOOT_MIN_DURATION - elapsed;
+  if (remaining <= 0) return;
+
+  if (remaining > 300) setBootStatus('Finalizando...');
+  await new Promise(resolve => window.setTimeout(resolve, remaining));
+}
+
+function beginAppLoading(message = 'Carregando...') {
+  const screen = document.getElementById('appBootScreen');
+  const startedAt = performance.now();
+  if (!screen) return startedAt;
+
+  setBootStatus(message);
+  /* Esconde primeiro o conteúdo por baixo do splash e só então o mostra.
+     A remoção do estado hidden é feita sem animação para que o loading apareça
+     imediatamente, sem deixar a tela anterior vazar por um frame. */
+  document.body.classList.add('app-booting');
+  screen.style.transition = 'none';
+  screen.classList.remove('is-hidden');
+  void screen.offsetHeight;
+  screen.style.transition = '';
+  return startedAt;
+}
+
+async function finishAppLoading(startedAt) {
+  await waitForMinimumBootDuration(startedAt);
+  const screen = document.getElementById('appBootScreen');
+  document.body.classList.remove('app-booting');
+  if (!screen) return;
+  screen.classList.add('is-hidden');
+}
+
+async function withAppLoading(message, task) {
+  const startedAt = beginAppLoading(message);
+  try {
+    return await task();
+  } finally {
+    await finishAppLoading(startedAt);
+  }
+}
+
+async function finishAppBoot() {
+  const startedAt = Number(window.__PROFESSORGEST_BOOT_STARTED_AT);
+  await finishAppLoading(startedAt);
+}
+
+async function startApp() {
+  initTheme();
+  setBootStatus('Carregando seu espaço...');
   loadDriveBinding();
   buildNav();
   bindGlobalEvents();
   bindSetupEvents();
+  setBootStatus('Preparando o ProfessorGest...');
   initGoogleDriveSdk();
   registerPwa();
-  showWelcomeScreen();
+  await showWelcomeScreen({ withLoading: false });
+
+  // Aguarda a primeira pintura útil para evitar o efeito de "interface montando".
+  try {
+    await Promise.race([
+      document.fonts?.ready || Promise.resolve(),
+      new Promise(resolve => setTimeout(resolve, 700)),
+    ]);
+  } catch (_) {}
+  await new Promise(requestAnimationFrame);
+  await new Promise(requestAnimationFrame);
+  await finishAppBoot();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  startApp().catch(async (err) => {
+    console.error('[ProfessorGest] Falha durante a inicialização.', err);
+    setBootStatus('Abrindo o ProfessorGest...');
+    await finishAppBoot();
+  });
 });
 
 window.addEventListener('beforeunload', (e) => {
@@ -1533,6 +2050,8 @@ function bindGlobalEvents() {
   document.getElementById('welcomeOpenFile').onclick = () => openFile();
   document.getElementById('welcomeDemo').onclick = () => beginDemoMode();
   document.getElementById('welcomeDrive')?.addEventListener('click', openDrivePicker);
+  document.getElementById('welcomeBackups')?.addEventListener('click', () => openBackupsModal({ global: true }));
+  document.getElementById('welcomeSettings')?.addEventListener('click', () => openWelcomeSettingsModal());
   document.getElementById('welcomeInstall')?.addEventListener('click', promptInstall);
   document.getElementById('welcomeThemeToggle').onclick = () => toggleTheme();
   document.getElementById('quickRegisterBtnDesktop').onclick = () => openOccurrenceModal();
@@ -1589,8 +2108,8 @@ function toast(message, kind) {
 /* ==================== nav ==================== */
 
 const VIEW_TITLES = {
-  dashboard: 'Dashboard', turmas: 'Turmas', alunos: 'Alunos', atividades: 'Atividades',
-  calendario: 'Calendário', ocorrencias: 'Ocorrências', relatorios: 'Relatórios',
+  dashboard: 'Início', turmas: 'Turmas', alunos: 'Alunos', atividades: 'Atividades',
+  calendario: 'Calendário', planejamento: 'Planejamento', ocorrencias: 'Ocorrências', relatorios: 'Relatórios',
   arquivo: 'Arquivo', configuracoes: 'Configurações',
   turmaDetail: 'Turma', alunoDetail: 'Perfil do aluno', atividadeDetail: 'Atividade',
   relatorioIndividual: 'Relatório individual', relatorioTurma: 'Relatório da turma',
@@ -1605,7 +2124,7 @@ function render() {
   const c = document.getElementById('viewContainer');
   const renderers = {
     dashboard: renderDashboard, turmas: renderTurmas, alunos: renderAlunos, atividades: renderAtividades,
-    calendario: renderCalendario, ocorrencias: renderOcorrenciasLog, relatorios: renderRelatoriosHub,
+    calendario: renderCalendario, planejamento: renderPlanejamento, ocorrencias: renderOcorrenciasLog, relatorios: renderRelatoriosHub,
     arquivo: renderArquivo, configuracoes: renderConfiguracoes,
     turmaDetail: renderTurmaDetail, alunoDetail: renderAlunoDetail, atividadeDetail: renderAtividadeDetail,
     relatorioIndividual: renderRelatorioIndividual, relatorioTurma: renderRelatorioTurma,
@@ -1698,7 +2217,24 @@ const studentActivityRenderers = createStudentActivityRenderers({
   progressBarHTML, emptyState, fmtDate, monthLabel, badgeFor, todayISO, ICONS
 });
 
-function renderWelcomeRecovery() { return welcomeViewRenderer.renderWelcomeRecovery(); }
+function renderWelcomeRecovery() {
+  welcomeViewRenderer.renderWelcomeRecovery();
+  updateWelcomeBackupAction();
+}
+
+async function updateWelcomeBackupAction() {
+  const button = document.getElementById('welcomeBackups');
+  if (!button) return;
+  button.classList.remove('is-hidden');
+  try {
+    const backups = await readAllProjectBackups(1);
+    button.title = backups.length ? 'Ver suas cópias de segurança' : 'Ver como funcionam as cópias de segurança';
+    button.setAttribute('aria-label', backups.length ? 'Ver suas cópias de segurança' : 'Ver como funcionam as cópias de segurança');
+  } catch (_) {
+    button.title = 'Cópias de segurança';
+    button.setAttribute('aria-label', 'Cópias de segurança');
+  }
+}
 function renderAlunos() { return studentActivityRenderers.renderAlunos(); }
 function renderAlunoDetail() { return studentActivityRenderers.renderAlunoDetail(); }
 function renderAtividades() { return studentActivityRenderers.renderAtividades(); }
@@ -1712,6 +2248,7 @@ const calendarOccurrenceRenderers = createCalendarOccurrenceRenderers({
 });
 
 function renderCalendario() { return calendarOccurrenceRenderers.renderCalendario(); }
+function renderPlanejamento() { return planningViewRenderer.renderPlanejamento(); }
 function renderOcorrenciasLog() { return calendarOccurrenceRenderers.renderOcorrenciasLog(); }
 function activitiesInMonth(ym) { return calendarOccurrenceRenderers.activitiesInMonth(ym); }
 
@@ -1730,11 +2267,15 @@ function renderRelatorioTurma() { return reportRenderers.renderRelatorioTurma();
 const fileSettingsRenderers = createFileSettingsRenderers({
   getState: () => state, esc, getDemoMode: () => demoMode, getCurrentFileName: () => currentFileName, getIsDirty: () => isDirty, ICONS,
   supportsFileShare, driveStatusTone, driveStatusText, driveBindingForCurrentProject,
-  fmtDate, fmtDateTime, getThemeMode, getDevLogEntries
+  fmtDate, fmtDateTime, getThemeMode, getDevLogEntries, getProjectBackups
 });
 
 function renderArquivo() { return fileSettingsRenderers.renderArquivo(); }
 function renderConfiguracoes() { return fileSettingsRenderers.renderConfiguracoes(); }
+
+const planningViewRenderer = createPlanningViewRenderer({
+  getState: () => state, getCtx: () => ctx, esc, fmtDate, classNameOf, emptyState, ICONS
+});
 
 const classViewRenderers = createClassViewRenderers({
   getState: () => state, getCtx: () => ctx, classById, classStats, studentsOf, occurrencesOf, studentById,
@@ -1742,12 +2283,11 @@ const classViewRenderers = createClassViewRenderers({
 });
 
 const welcomeViewRenderer = createWelcomeViewRenderer({
-  getCurrentFileName: () => currentFileName,
   readLocalRecoveryDraft,
-  readLocalProjectRecord,
+  readLocalProjectRecords,
   recoverLocalDraft,
-  discardLocalRecoveryDraft,
   restorePersistedProject,
+  restorePersistedProjectById,
   formatRecoveryTime,
   updateWelcomeExperience,
   toast,
@@ -2012,8 +2552,10 @@ function applyOpenedData(data, fileName, cloudMeta = null, fileHandle = null, op
   } else {
     toast('Arquivo aberto com sucesso.', 'success');
     if (options.persistLocal !== false) {
-      saveLocalProjectSnapshot({ stateData: data, storageMode: currentStorageMode, fileName: currentFileName, fileHandle: currentFileHandle, fileLastModified: currentFileLastModified }).then(ok => {
+      saveLocalProjectSnapshot({ stateData: data, storageMode: currentStorageMode, fileName: currentFileName, fileHandle: currentFileHandle, fileLastModified: currentFileLastModified }).then(async ok => {
         if (!ok) console.warn('[ProfessorGest] A cópia local do arquivo aberto não pôde ser persistida.');
+        await refreshProjectBackups(state.projectId);
+        await createAutomaticBackup('Arquivo aberto', { force: true });
       });
     }
   }
@@ -2022,7 +2564,7 @@ function applyOpenedData(data, fileName, cloudMeta = null, fileHandle = null, op
 }
 
 async function openFile(skipConfirm = false) {
-    if (!skipConfirm && workspaceReady && isDirty) {
+  if (!skipConfirm && workspaceReady && isDirty) {
     confirmModal({
       title: 'Abrir outro arquivo?',
       body: 'O projeto atual possui alterações que ainda não foram salvas. Abrir outro arquivo vai substituir o projeto que está aberto nesta sessão.',
@@ -2031,6 +2573,7 @@ async function openFile(skipConfirm = false) {
     });
     return;
   }
+
   if (supportsNativeFilePicker()) {
     try {
       const [handle] = await window.showOpenFilePicker({
@@ -2038,59 +2581,79 @@ async function openFile(skipConfirm = false) {
         excludeAcceptAllOption: false,
         multiple: false
       });
-      const file = await handle.getFile();
-            const text = await readTextFileUtf8(file);
-      const result = validateAndParseProf(text);
-      if (!result.ok) {
-        logError('file.open.invalid', new Error('Arquivo selecionado não passou na validação.'), {
-          filename: file.name, mime: file.type || '', size: file.size, errorCode: result.error || 'invalid'
-        });
-        showFileErrorModal(errorMessage(result.error), result.details || []);
-        return;
-      }
-      applyOpenedData(result.data, file.name, null, /\.prof$/i.test(file.name) ? handle : null, {
-        storageMode: 'file',
-        fileLastModified: file.lastModified,
-        persistLocal: true,
-        warnings: result.warnings || [],
+      if (!handle) return;
+
+      let openError = null;
+      await withAppLoading('Abrindo seu arquivo...', async () => {
+        try {
+          const file = await handle.getFile();
+          const text = await readTextFileUtf8(file);
+          const result = validateAndParseProf(text);
+          if (!result.ok) {
+            logError('file.open.invalid', new Error('Arquivo selecionado não passou na validação.'), {
+              filename: file.name, mime: file.type || '', size: file.size, errorCode: result.error || 'invalid'
+            });
+            openError = { message: errorMessage(result.error), details: result.details || [] };
+            return false;
+          }
+          applyOpenedData(result.data, file.name, null, /\.prof$/i.test(file.name) ? handle : null, {
+            storageMode: 'file',
+            fileLastModified: file.lastModified,
+            persistLocal: true,
+            warnings: result.warnings || [],
+          });
+          return true;
+        } catch (err) {
+          logError('file.open.native_failed', err, { nativePicker: true, android: isAndroidDevice() });
+          openError = { message: 'Não foi possível ler o arquivo selecionado.' };
+          return false;
+        }
       });
+      if (openError) showFileErrorModal(openError.message, openError.details || []);
       return;
     } catch (err) {
-      if (err && err.name === 'AbortError') {
-                return;
-      }
-      logError('file.open.native_failed', err, { nativePicker: true, android: isAndroidDevice() });
+      if (err && err.name === 'AbortError') return;
+      logError('file.open.native_picker_failed', err, { nativePicker: true, android: isAndroidDevice() });
+      showFileErrorModal('Não foi possível abrir o arquivo selecionado.');
+      return;
     }
   }
-    document.getElementById('fileInput').click();
+
+  document.getElementById('fileInput').click();
 }
 
 async function handleFileOpenInput(e) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
-  try {
-        const text = await readTextFileUtf8(file);
-    const result = validateAndParseProf(text);
-    if (!result.ok) {
-      logError('file.open.invalid', new Error('Arquivo selecionado não passou na validação.'), {
-        filename: file.name, mime: file.type || '', size: file.size, errorCode: result.error || 'invalid'
+
+  let openError = null;
+  await withAppLoading('Abrindo seu arquivo...', async () => {
+    try {
+      const text = await readTextFileUtf8(file);
+      const result = validateAndParseProf(text);
+      if (!result.ok) {
+        logError('file.open.invalid', new Error('Arquivo selecionado não passou na validação.'), {
+          filename: file.name, mime: file.type || '', size: file.size, errorCode: result.error || 'invalid'
+        });
+        openError = { message: errorMessage(result.error), details: result.details || [] };
+        return;
+      }
+      applyOpenedData(result.data, file.name, null, null, {
+        storageMode: 'local',
+        fileLastModified: file.lastModified,
+        persistLocal: true,
+        warnings: result.warnings || [],
       });
-      showFileErrorModal(errorMessage(result.error), result.details || []);
-      return;
+    } catch (err) {
+      logError('file.open.read_failed', err, {
+        filename: file?.name || '', mime: file?.type || '', size: file?.size || 0
+      });
+      openError = { message: 'Não foi possível abrir o arquivo selecionado.' };
     }
-    applyOpenedData(result.data, file.name, null, null, {
-      storageMode: 'local',
-      fileLastModified: file.lastModified,
-      persistLocal: true,
-      warnings: result.warnings || [],
-    });
-  } catch (err) {
-    logError('file.open.read_failed', err, {
-      filename: file?.name || '', mime: file?.type || '', size: file?.size || 0
-    });
-    showFileErrorModal('Não foi possível ler o arquivo selecionado.');
-  }
+  });
+
+  if (openError) showFileErrorModal(openError.message, openError.details || []);
 }
 
 function profDownloadName(filename) {
@@ -2121,6 +2684,7 @@ function downloadFallback(content, filename, mime) {
 async function shareCurrentProfFile() {
   if (demoMode || !state) return false;
   const payload = buildSavePayload();
+  await createAutomaticBackup('Antes de salvar');
   const json = JSON.stringify(payload, null, 2);
   const name = normalizeProfFileName(currentFileName || `professorgest-${safeFileName(state?.teacher?.name || 'professorgest')}.prof`);
   const shared = await shareFileFallback(json, name, PROF_MIME);
@@ -2137,11 +2701,11 @@ async function exportCurrentProfFile() {
   try {
     const check = JSON.parse(json);
     if (!check || check.format !== PROF_FORMAT || Number(check.version) !== CURRENT_VERSION) {
-      throw new Error('O conteúdo gerado não corresponde ao formato do ProfessorGest.');
+      throw new Error('Não foi possível preparar a cópia do arquivo.');
     }
   } catch (err) {
     logError('file.export.prepare_failed', err);
-    toast(err?.message || 'Não foi possível gerar um JSON válido para exportação.', 'error');
+    toast(err?.message || 'Não foi possível preparar a cópia do arquivo.', 'error');
     return false;
   }
   const teacherBase = safeFileName(state?.teacher?.name || 'professorgest');
@@ -2242,10 +2806,11 @@ async function checkExternalFileConflict(forceOverwrite = false) {
   return false;
 }
 
-async function saveFile({ fromPrimarySave = false, forceOverwrite = false } = {}) {
+async function saveFile({ fromPrimarySave = false, forceOverwrite = false, skipCloudSync = false } = {}) {
   if (demoMode) { toast('A demonstração é apenas para explorar o sistema.', 'info'); return false; }
   const saveRevision = dirtyRevision;
   const payload = buildSavePayload();
+  await createAutomaticBackup('Antes de salvar');
   const json = JSON.stringify(payload, null, 2);
   const teacherBase = safeFileName(state?.teacher?.name || 'professorgest');
   const suggestedName = currentFileName ? normalizeProfFileName(currentFileName) : `professorgest-${teacherBase}.prof`;
@@ -2288,11 +2853,11 @@ async function saveFile({ fromPrimarySave = false, forceOverwrite = false } = {}
     }
     discardLocalRecoveryDraft();
     clearDirty({ expectedRevision: saveRevision });
-    if (!driveBindingForCurrentProject()) {
-      cloudSyncPending = false;
+    if (!driveBindingForCurrentProject() || skipCloudSync) {
+      cloudSyncPending = skipCloudSync ? !!driveBindingForCurrentProject() : false;
       setSaveUiState('saved');
       updateSaveChrome();
-      toast(currentStorageMode === 'local' ? 'Alterações salvas neste dispositivo.' : 'Arquivo salvo com sucesso.', 'success');
+      toast(skipCloudSync && driveBindingForCurrentProject() ? 'Alterações salvas neste dispositivo. A sincronização com o Drive ficou pendente.' : (currentStorageMode === 'local' ? 'Alterações salvas neste dispositivo.' : 'Arquivo salvo com sucesso.'), 'success');
       render();
       return true;
     }
@@ -2400,6 +2965,23 @@ function openStudentModal(existing, presetClassId) {
   document.getElementById('studentForm').dataset.editId = existing ? existing.id : '';
 }
 
+function openMoveStudentModal(studentIds) {
+  const ids = [...new Set((studentIds || []).filter(Boolean))];
+  const students = ids.map(studentById).filter(Boolean);
+  if (!students.length) return;
+  const currentClassIds = new Set(students.map(student => student.classId).filter(Boolean));
+  const options = state.classes.filter(c => !c.archived || currentClassIds.has(c.id)).map(c => `<option value="${esc(c.id)}" ${students.length === 1 && students[0].classId === c.id ? 'selected' : ''}>${esc(c.name)}${c.archived ? ' — arquivada' : ''}</option>`).join('');
+  openModal(`
+    <div class="modal-title">${students.length > 1 ? 'Mudar alunos de turma' : 'Mudar aluno de turma'}</div>
+    <p class="confirm-body">${students.length > 1 ? `<strong>${students.length} alunos</strong> serão movidos para a turma escolhida.` : `<strong>${esc(students[0].name)}</strong> será movido para a turma escolhida.`} O histórico de atividades, observações e ocorrências será mantido.</p>
+    <form id="moveStudentForm">
+      <input type="hidden" name="studentIds" value="${esc(ids.join(','))}">
+      <div class="form-group"><label class="form-label" for="moveStudentClassInput">Nova turma</label><select class="form-select" id="moveStudentClassInput" name="classId" required>${options}</select></div>
+      <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn-primary">${students.length > 1 ? 'Mudar alunos' : 'Mudar de turma'}</button></div>
+    </form>
+  `);
+}
+
 function openActivityModal(existing, presetClassId) {
   openModal(`
     <div class="modal-title">${existing ? 'Editar atividade' : 'Nova atividade'}</div>
@@ -2415,6 +2997,69 @@ function openActivityModal(existing, presetClassId) {
     </form>
   `);
   document.getElementById('activityForm').dataset.editId = existing ? existing.id : '';
+}
+
+function openPlanningModal(existing, presetClassId = '') {
+  openModal(`
+    <div class="modal-title">${existing ? 'Editar planejamento' : 'Novo planejamento'}</div>
+    <form id="planningForm">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="planningDateInput">Data da aula</label><input class="form-input" id="planningDateInput" type="date" name="date" required value="${existing ? existing.date : todayISO()}"></div>
+        <div class="form-group"><label class="form-label" for="planningClassInput">Turma</label><select class="form-select" id="planningClassInput" name="classId" required>${classOptions(existing ? existing.classId : (presetClassId || ctx.classId || ''))}</select></div>
+      </div>
+      <div class="form-group"><label class="form-label" for="planningTitleInput">Tema da aula</label><input class="form-input" id="planningTitleInput" name="title" required value="${existing ? esc(existing.title) : ''}" placeholder="Ex.: Frações equivalentes"></div>
+      <div class="form-group"><label class="form-label" for="planningContentInput">Conteúdo</label><textarea class="form-textarea" id="planningContentInput" name="content" placeholder="O que será trabalhado nesta aula?">${existing ? esc(existing.content || '') : ''}</textarea></div>
+      <div class="form-group"><label class="form-label" for="planningObjectivesInput">Objetivos de aprendizagem</label><textarea class="form-textarea" id="planningObjectivesInput" name="objectives" placeholder="O que os alunos deverão compreender ou conseguir fazer?">${existing ? esc(existing.objectives || '') : ''}</textarea></div>
+      <div class="form-group"><label class="form-label" for="planningMethodologyInput">Como será a aula?</label><textarea class="form-textarea" id="planningMethodologyInput" name="methodology" placeholder="Ex.: explicação, atividade em grupo, exercícios...">${existing ? esc(existing.methodology || '') : ''}</textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="planningResourcesInput">Recursos</label><textarea class="form-textarea" id="planningResourcesInput" name="resources" placeholder="Livro, quadro, projetor...">${existing ? esc(existing.resources || '') : ''}</textarea></div>
+        <div class="form-group"><label class="form-label" for="planningAssessmentInput">Acompanhamento / avaliação</label><textarea class="form-textarea" id="planningAssessmentInput" name="assessment" placeholder="Como você pretende observar a aprendizagem?">${existing ? esc(existing.assessment || '') : ''}</textarea></div>
+      </div>
+      <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn-primary">${existing ? 'Salvar planejamento' : 'Criar planejamento'}</button></div>
+    </form>
+  `, true);
+  document.getElementById('planningForm').dataset.editId = existing ? existing.id : '';
+}
+
+function openPlanningViewModal(plan) {
+  if (!plan) return;
+  const field = (label, value) => `<section class="planning-detail-section"><div class="planning-detail-label">${label}</div><div class="planning-detail-value">${value ? esc(value).replace(/\n/g, '<br>') : '<span class="planning-detail-empty">Não preenchido</span>'}</div></section>`;
+  openModal(`
+    <div class="planning-detail-modal">
+      <div class="modal-title">${esc(plan.title)}</div>
+      <div class="planning-detail-meta">${fmtDate(plan.date)} · ${esc(classNameOf(plan.classId))}</div>
+      ${field('Conteúdo', plan.content)}
+      ${field('Objetivos de aprendizagem', plan.objectives)}
+      ${field('Como será a aula?', plan.methodology)}
+      ${field('Recursos', plan.resources)}
+      ${field('Acompanhamento / avaliação', plan.assessment)}
+      <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Fechar</button><button type="button" class="btn-primary" id="btnEditPlanningFromView">${ICONS.edit} Editar planejamento</button></div>
+    </div>
+  `, true);
+  onClick('#btnEditPlanningFromView', () => { closeModal(); openPlanningModal(plan); });
+}
+
+function duplicatePlanning(planId) {
+  const source = (state.plans || []).find(plan => plan.id === planId);
+  if (!source) return;
+  openPlanningModal({ ...source, id: '', date: source.date, title: `${source.title} — cópia` });
+}
+
+function openStudentActionsModal(student) {
+  if (!student) return;
+  openModal(`
+    <div class="modal-title">Ações para ${esc(student.name)}</div>
+    <p class="confirm-body">Escolha o que deseja fazer com este aluno.</p>
+    <div class="action-list">
+      <button type="button" class="action-list-item" id="studentActionEdit">${ICONS.edit}<span><strong>Editar aluno</strong><small>Atualizar nome ou turma</small></span></button>
+      <button type="button" class="action-list-item" id="studentActionMove">${ICONS.move}<span><strong>Mudar de turma</strong><small>Transferir mantendo o histórico</small></span></button>
+      <button type="button" class="action-list-item" id="studentActionReport">${ICONS.report}<span><strong>Gerar relatório</strong><small>Escolher período e conteúdo</small></span></button>
+    </div>
+    <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Fechar</button></div>
+  `);
+  onClick('#studentActionEdit', () => { closeModal(); openStudentModal(student); });
+  onClick('#studentActionMove', () => { closeModal(); openMoveStudentModal([student.id]); });
+  onClick('#studentActionReport', () => { closeModal(); openIndividualReportConfig(student.id); });
 }
 
 function openObservationModal(student, existing) {
@@ -2510,6 +3155,25 @@ function bindModalEvents() {
     markDirty(); closeModal(); render();
   };
 
+  const moveStudentForm = document.getElementById('moveStudentForm');
+  if (moveStudentForm) moveStudentForm.onsubmit = e => {
+    e.preventDefault();
+    const ids = String(e.target.studentIds.value || '').split(',').filter(Boolean);
+    const classId = e.target.classId.value;
+    const targetClass = classById(classId);
+    if (!targetClass || targetClass.archived) { toast('Escolha uma turma ativa.', 'error'); return; }
+    let moved = 0;
+    ids.forEach(id => {
+      const student = studentById(id);
+      if (student && student.classId !== classId) { student.classId = classId; moved++; }
+    });
+    if (!moved) { toast('Nenhum aluno precisou ser movido.', 'info'); closeModal(); return; }
+    markDirty(); closeModal();
+    ctx.bulkMode = false; ctx.bulkSelected = new Set();
+    toast(`${moved} aluno(s) movido(s) para ${targetClass.name}. O histórico foi mantido.`, 'success');
+    render();
+  };
+
   const activityForm = document.getElementById('activityForm');
   if (activityForm) activityForm.onsubmit = e => {
     e.preventDefault();
@@ -2522,6 +3186,31 @@ function bindModalEvents() {
     } else {
       state.activities.push({ id: uid('act'), name: f.name.value.trim(), classId: f.classId.value, dueDate: f.dueDate.value, description: f.description.value.trim(), completions: {} });
       toast('Atividade criada com sucesso.', 'success');
+    }
+    markDirty(); closeModal(); render();
+  };
+
+  const planningForm = document.getElementById('planningForm');
+  if (planningForm) planningForm.onsubmit = e => {
+    e.preventDefault();
+    const f = e.target;
+    const title = f.title.value.trim();
+    if (!title || !f.date.value || !f.classId.value) return;
+    state.plans = Array.isArray(state.plans) ? state.plans : [];
+    const editId = planningForm.dataset.editId;
+    const data = {
+      date: f.date.value, classId: f.classId.value, title,
+      content: f.content.value.trim(), objectives: f.objectives.value.trim(),
+      methodology: f.methodology.value.trim(), resources: f.resources.value.trim(),
+      assessment: f.assessment.value.trim()
+    };
+    if (editId) {
+      const plan = state.plans.find(item => item.id === editId);
+      if (plan) Object.assign(plan, data);
+      toast('Planejamento atualizado.', 'success');
+    } else {
+      state.plans.push({ id: uid('plan'), ...data });
+      toast('Planejamento criado.', 'success');
     }
     markDirty(); closeModal(); render();
   };
@@ -2615,10 +3304,11 @@ function openCommandPalette(term) {
   const t = (term || '').trim().toLowerCase();
 
   const actions = [
-    { icon: 'plus', label: 'Registro rápido', run: () => openOccurrenceModal() },
+    { icon: 'plus', label: 'Registrar ocorrência', run: () => openOccurrenceModal() },
     { icon: 'users', label: 'Nova turma', run: () => openClassModal(null) },
     { icon: 'user', label: 'Novo aluno', run: () => openStudentModal(null, null) },
     { icon: 'clipboard', label: 'Nova atividade', run: () => openActivityModal(null) },
+    { icon: 'calendar', label: 'Novo planejamento', run: () => openPlanningModal(null, '') },
     { icon: 'folder', label: 'Abrir arquivo', run: () => openFile() },
     { icon: 'file', label: 'Criar novo arquivo', run: () => beginNewProjectSetup(true) },
     { icon: 'sparkle', label: 'Explorar demonstração', run: () => beginDemoMode() },
@@ -2627,19 +3317,22 @@ function openCommandPalette(term) {
 
   const classes = state.classes.filter(c => !t || c.name.toLowerCase().includes(t)).slice(0, 5);
   const students = state.students.filter(s => !t || s.name.toLowerCase().includes(t)).slice(0, 6);
-  const activities = state.activities.filter(a => !t || a.name.toLowerCase().includes(t)).slice(0, 5);
+  const activities = state.activities.filter(a => !t || [a.name, a.description, classNameOf(a.classId)].some(v => String(v || '').toLowerCase().includes(t))).slice(0, 5);
+  const plans = (state.plans || []).filter(plan => !t || [plan.title, plan.content, plan.objectives, plan.methodology, classNameOf(plan.classId)]
+    .some(v => String(v || '').toLowerCase().includes(t))).slice(0, 5);
 
-  const hasResults = actions.length || classes.length || students.length || activities.length;
+  const hasResults = actions.length || classes.length || students.length || activities.length || plans.length;
 
   root.innerHTML = `
     <div class="cmdk-overlay" id="cmdkOverlay">
       <div class="cmdk-box">
-        <div class="cmdk-input-row">${ICONS.search}<input class="cmdk-input" id="cmdkInput" placeholder="Pesquisar alunos, turmas, atividades ou ações..." value="${esc(term || '')}"><span class="cmdk-esc">ESC</span></div>
+        <div class="cmdk-input-row">${ICONS.search}<input class="cmdk-input" id="cmdkInput" placeholder="Buscar alunos, turmas, atividades, planejamentos ou ações..." value="${esc(term || '')}"><span class="cmdk-esc">ESC</span></div>
         <div class="cmdk-results">
           ${!hasResults ? `<div class="cmdk-empty">Nenhum resultado encontrado.</div>` : `
           ${students.length ? `<div class="cmdk-group-label">ALUNOS</div>${students.map(s => `<div class="cmdk-item" data-cmdk-student="${esc(s.id)}">${ICONS.user}<span>${esc(s.name)}</span><span class="cmdk-item-sub">${esc(classNameOf(s.classId))}</span></div>`).join('')}` : ''}
           ${classes.length ? `<div class="cmdk-group-label">TURMAS</div>${classes.map(c => `<div class="cmdk-item" data-cmdk-class="${esc(c.id)}">${ICONS.users}<span>${esc(c.name)}</span></div>`).join('')}` : ''}
-          ${activities.length ? `<div class="cmdk-group-label">ATIVIDADES</div>${activities.map(a => `<div class="cmdk-item" data-cmdk-activity="${esc(a.id)}">${ICONS.clipboard}<span>${esc(a.name)}</span><span class="cmdk-item-sub">${fmtDate(a.dueDate)}</span></div>`).join('')}` : ''}
+          ${activities.length ? `<div class="cmdk-group-label">ATIVIDADES</div>${activities.map(a => `<div class="cmdk-item" data-cmdk-activity="${esc(a.id)}">${ICONS.clipboard}<span>${esc(a.name)}</span><span class="cmdk-item-sub">${esc(classNameOf(a.classId))} · ${fmtDate(a.dueDate)}</span></div>`).join('')}` : ''}
+          ${plans.length ? `<div class="cmdk-group-label">PLANEJAMENTOS</div>${plans.map(plan => `<div class="cmdk-item" data-cmdk-plan="${esc(plan.id)}">${ICONS.calendar}<span>${esc(plan.title)}</span><span class="cmdk-item-sub">${esc(classNameOf(plan.classId))} · ${fmtDate(plan.date)}</span></div>`).join('')}` : ''}
           ${actions.length ? `<div class="cmdk-group-label">AÇÕES</div>${actions.map((a, i) => `<div class="cmdk-item" data-cmdk-action="${esc(i)}">${ICONS[a.icon]}<span>${esc(a.label)}</span></div>`).join('')}` : ''}
           `}
         </div>
@@ -2655,6 +3348,7 @@ function openCommandPalette(term) {
   qAll('[data-cmdk-student]').forEach(el => el.onclick = () => { closeCommandPalette(); ctx.studentId = el.dataset.cmdkStudent; ctx.studentTab = 'visao'; navigate('alunoDetail', false); });
   qAll('[data-cmdk-class]').forEach(el => el.onclick = () => { closeCommandPalette(); ctx.classId = el.dataset.cmdkClass; ctx.classTab = 'visao'; navigate('turmaDetail', false); });
   qAll('[data-cmdk-activity]').forEach(el => el.onclick = () => { closeCommandPalette(); ctx.activityId = el.dataset.cmdkActivity; navigate('atividadeDetail', false); });
+  qAll('[data-cmdk-plan]').forEach(el => el.onclick = () => { closeCommandPalette(); const plan = (state.plans || []).find(item => item.id === el.dataset.cmdkPlan); if (plan) openPlanningViewModal(plan); });
   qAll('[data-cmdk-action]').forEach(el => el.onclick = () => { const a = actions[Number(el.dataset.cmdkAction)]; closeCommandPalette(); if (a) a.run(); });
 }
 
@@ -2678,6 +3372,7 @@ function bindViewEvents() {
   qAll('[data-open-class]').forEach(el => el.onclick = () => { ctx.classId = el.dataset.openClass; ctx.classTab = 'visao'; navigate('turmaDetail', false); });
   qAll('[data-open-student]').forEach(el => el.onclick = () => { ctx.studentId = el.dataset.openStudent; ctx.studentTab = 'visao'; ctx.histFilter = 'todos'; ctx.histMonth = ''; navigate('alunoDetail', false); });
   qAll('[data-open-activity]').forEach(el => el.onclick = () => { ctx.activityId = el.dataset.openActivity; navigate('atividadeDetail', false); });
+  qAll('[data-view-plan]').forEach(el => el.onclick = e => { e.stopPropagation(); const plan = (state.plans || []).find(item => item.id === el.dataset.viewPlan); openPlanningViewModal(plan); });
 
   qAll('[data-attention-idx]').forEach(el => el.onclick = () => { const it = lastAttentionItems[Number(el.dataset.attentionIdx)]; if (it) it.action(); });
 
@@ -2695,6 +3390,8 @@ function bindViewEvents() {
   /* --- turmas --- */
   onClick('#btnNewClass', () => openClassModal(null));
   onClick('#btnToggleArchivedClasses', () => { ctx.showArchivedClasses = !ctx.showArchivedClasses; render(); });
+  const classSearchInput = q('#classSearchInput');
+  if (classSearchInput) classSearchInput.oninput = () => { ctx.classSearch = classSearchInput.value; rerenderKeepFocus(); };
   qAll('[data-edit-class]').forEach(el => el.onclick = e => { e.stopPropagation(); openClassModal(classById(el.dataset.editClass)); });
   qAll('[data-dup-class]').forEach(el => el.onclick = e => { e.stopPropagation(); duplicateClass(el.dataset.dupClass); });
   qAll('[data-archive-class]').forEach(el => el.onclick = e => { e.stopPropagation(); toggleArchiveClass(el.dataset.archiveClass); });
@@ -2712,12 +3409,17 @@ function bindViewEvents() {
   /* --- seleção em massa (alunos da turma) --- */
   onClick('#btnToggleBulk', () => { ctx.bulkMode = !ctx.bulkMode; ctx.bulkSelected = new Set(); render(); });
   qAll('[data-bulk-student]').forEach(el => el.onchange = () => {
+    if (currentView === 'alunos') return;
     if (el.checked) ctx.bulkSelected.add(el.dataset.bulkStudent); else ctx.bulkSelected.delete(el.dataset.bulkStudent);
     render();
   });
   onClick('#btnBulkSelectAll', () => {
     const ids = currentView === 'atividadeDetail' ? studentsOf(state.activities.find(a => a.id === ctx.activityId).classId).map(s => s.id) : studentsOf(ctx.classId).map(s => s.id);
     ctx.bulkSelected = new Set(ids); render();
+  });
+  onClick('#btnBulkMoveStudents', () => {
+    if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
+    openMoveStudentModal([...ctx.bulkSelected]);
   });
   onClick('#btnBulkOccurrence', () => {
     if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
@@ -2733,11 +3435,26 @@ function bindViewEvents() {
 
   /* --- alunos --- */
   onClick('#btnNewStudent', () => openStudentModal(null, null));
+  onClick('#btnToggleStudentBulk', () => { ctx.bulkMode = !ctx.bulkMode; ctx.bulkSelected = new Set(); render(); });
+  qAll('#studentListBody [data-bulk-student]').forEach(el => el.onchange = () => {
+    if (el.checked) ctx.bulkSelected.add(el.dataset.bulkStudent); else ctx.bulkSelected.delete(el.dataset.bulkStudent);
+    render();
+  });
+  onClick('#btnStudentBulkSelectAll', () => {
+    const ids = [...qAll('#studentListBody [data-bulk-student]')].map(el => el.dataset.bulkStudent);
+    ctx.bulkSelected = new Set(ids);
+    render();
+  });
+  onClick('#btnStudentBulkMove', () => {
+    if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
+    openMoveStudentModal([...ctx.bulkSelected]);
+  });
   onClick('#btnAddStudentHere', () => openStudentModal(null, ctx.classId));
   qAll('[data-edit-student]').forEach(el => el.onclick = e => { e.stopPropagation(); openStudentModal(studentById(el.dataset.editStudent)); });
+  qAll('[data-move-student]').forEach(el => el.onclick = e => { e.stopPropagation(); openMoveStudentModal([el.dataset.moveStudent]); });
   qAll('[data-quick-occ-student]').forEach(el => el.onclick = e => { e.stopPropagation(); openOccurrenceModal(el.dataset.quickOccStudent); });
   qAll('[data-del-student]').forEach(el => el.onclick = e => { e.stopPropagation(); deleteStudent(el.dataset.delStudent); });
-  onClick('#btnEditThisStudent', () => openStudentModal(studentById(ctx.studentId)));
+  onClick('#btnStudentActions', () => openStudentActionsModal(studentById(ctx.studentId)));
   onClick('#btnRegisterForStudent', () => openOccurrenceModal(ctx.studentId));
 
   const studentSearchInput = q('#studentSearchInput');
@@ -2802,8 +3519,29 @@ function bindViewEvents() {
     markDirty(); render();
   });
   qAll('[data-activity-filter]').forEach(el => el.onclick = () => { ctx.activityFilter = el.dataset.activityFilter; render(); });
+  const activitySearchInput = q('#activitySearchInput');
+  if (activitySearchInput) activitySearchInput.oninput = () => { ctx.activitySearch = activitySearchInput.value; rerenderKeepFocus(); };
   const activityClassFilterSelect = q('#activityClassFilterSelect');
   if (activityClassFilterSelect) activityClassFilterSelect.onchange = () => { ctx.activityClassFilter = activityClassFilterSelect.value; render(); };
+
+  /* --- planejamento --- */
+  onClick('#btnNewPlan', () => openPlanningModal(null, ctx.classId || ''));
+  qAll('[data-edit-plan]').forEach(el => el.onclick = () => openPlanningModal((state.plans || []).find(plan => plan.id === el.dataset.editPlan)));
+  qAll('[data-dup-plan]').forEach(el => el.onclick = () => duplicatePlanning(el.dataset.dupPlan));
+  qAll('[data-del-plan]').forEach(el => el.onclick = () => {
+    confirmModal({ title: 'Excluir planejamento', body: 'Este planejamento será excluído permanentemente.', confirmLabel: 'Excluir', danger: true, onConfirm: () => {
+      state.plans = (state.plans || []).filter(plan => plan.id !== el.dataset.delPlan);
+      markDirty(); toast('Planejamento excluído.', 'success'); render();
+    }});
+  });
+  const planningSearchInput = q('#planningSearchInput');
+  if (planningSearchInput) planningSearchInput.oninput = () => { ctx.planningSearch = planningSearchInput.value; rerenderKeepFocus(); };
+  const planningClassFilterSelect = q('#planningClassFilterSelect');
+  if (planningClassFilterSelect) planningClassFilterSelect.onchange = () => { ctx.planningClassFilter = planningClassFilterSelect.value; render(); };
+  const planningFromInput = q('#planningFromInput');
+  if (planningFromInput) planningFromInput.onchange = () => { ctx.planningFrom = planningFromInput.value; render(); };
+  const planningToInput = q('#planningToInput');
+  if (planningToInput) planningToInput.onchange = () => { ctx.planningTo = planningToInput.value; render(); };
 
   /* --- calendário --- */
   const calClassFilterSelect = q('#calClassFilterSelect');
@@ -2843,6 +3581,7 @@ function bindViewEvents() {
   onClick('#btnNewFile', () => beginNewProjectSetup(true));
   onClick('#btnOpenFile', () => openFile());
   onClick('#btnSaveFile', () => saveFile());
+  onClick('#btnOpenBackups', () => openBackupsModal());
   onClick('#btnExportProf', () => exportCurrentProfFile());
   onClick('#btnShareProf', () => shareCurrentProfFile());
   onClick('#btnDriveOpen', openDrivePicker);
@@ -2852,9 +3591,11 @@ function bindViewEvents() {
   onClick('#btnDriveActionSettings', saveCurrentToGoogleDrive);
   onClick('#btnDriveDisconnectSettings', disconnectCurrentDriveFile);
   onClick('#btnExportDevLog', () => exportDevLog());
+  onClick('#btnGoFileFromSettings', () => navigate('arquivo'));
+  onClick('#btnOpenLocalDataSettings', () => openLocalDataManager());
   onClick('#btnClearDevLog', () => {
     clearDevLog();
-    toast('Log técnico limpo.', 'success');
+    toast('Registros de problemas apagados.', 'success');
     render();
   });
   onClick('#btnExportCsv', () => exportStudentsCsv());
@@ -3023,6 +3764,7 @@ function buildSavePayload() {
     students: state.students,
     activities: state.activities,
     occurrences: state.occurrences,
+    plans: Array.isArray(state.plans) ? state.plans : [],
   };
 }
 
@@ -3057,5 +3799,9 @@ function loadDemoData() {
     teacher: { name: 'Mariana Alves', school: 'Colégio Horizonte', subject: 'Língua Portuguesa' },
     classes: [{ id: c1, name: '1º Ano A', archived: false }, { id: c2, name: '2º Ano A', archived: false }],
     students: s, activities, occurrences,
+    plans: [
+      { id: uid('plan'), classId: c1, date: addDays(1), title: 'Leitura e interpretação de texto', content: 'Leitura compartilhada de uma crônica curta.', objectives: 'Identificar ideia principal e informações explícitas.', methodology: 'Leitura em duplas seguida de conversa coletiva.', resources: 'Livro e quadro.', assessment: 'Perguntas de compreensão e participação.' },
+      { id: uid('plan'), classId: c2, date: addDays(2), title: 'Produção de texto', content: 'Planejamento e escrita de um pequeno texto.', objectives: 'Organizar ideias antes da escrita.', methodology: 'Roteiro no quadro e produção individual.', resources: 'Caderno e quadro.', assessment: 'Revisão inicial do texto.' },
+    ],
   };
 }

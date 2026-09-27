@@ -16,9 +16,42 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<script>
+  // Define o tema antes da primeira pintura para evitar o "flash" de tema claro/escuro.
+  (() => {
+    try {
+      const saved = localStorage.getItem('professorgest-theme');
+      const mode = ['light', 'dark', 'system'].includes(saved) ? saved : 'light';
+      const resolved = mode === 'dark' || (mode === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.dataset.themeMode = mode;
+    } catch (_) {
+      document.documentElement.dataset.theme = 'light';
+      document.documentElement.dataset.themeMode = 'light';
+    }
+  })();
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="app-booting">
+
+<div class="app-boot-screen" id="appBootScreen" role="status" aria-live="polite" aria-label="Carregando ProfessorGest">
+  <div class="app-boot-glow app-boot-glow-one"></div>
+  <div class="app-boot-glow app-boot-glow-two"></div>
+  <div class="app-boot-content">
+    <div class="app-boot-mark">
+      <img src="logo.svg?v=21" alt="" width="52" height="52">
+    </div>
+    <div class="app-boot-brand">ProfessorGest</div>
+    <div class="app-boot-subtitle">gestão pedagógica</div>
+    <div class="app-boot-loader" aria-hidden="true"><span></span></div>
+    <div class="app-boot-status" id="appBootStatus">Preparando seu espaço...</div>
+  </div>
+</div>
+<script>
+  // Marca o início do splash depois que seu elemento já existe no documento.
+  window.__PROFESSORGEST_BOOT_STARTED_AT = performance.now();
+</script>
 
 <div class="welcome-screen" id="welcomeScreen">
   <div class="welcome-orb orb-one"></div>
@@ -39,53 +72,66 @@
 
   <main class="welcome-content welcome-content-minimal">
     <div class="welcome-mark"><img src="logo.svg?v=21" alt=""></div>
-    <div class="welcome-eyebrow">PROFESSORGEST</div>
-    <h1>Seu espaço de trabalho.</h1>
-    <p class="welcome-lead">Escolha como começar.</p>
+    <h1>Vamos começar.</h1>
+    <p class="welcome-lead">Abra seu arquivo ou crie um novo espaço de trabalho.</p>
 
     <div class="welcome-actions welcome-actions-refined">
+      <button class="welcome-card" id="welcomeOpenFile" type="button">
+        <span class="welcome-card-icon folder" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7.5A2 2 0 0 1 5 5.5h5l2 2h7a2 2 0 0 1 2 2v7A2 2 0 0 1 19 18.5H5a2 2 0 0 1-2-2z"/><path d="M3.5 10h17"/></svg>
+        </span>
+        <span class="welcome-card-copy">
+          <strong>Abrir arquivo</strong>
+          <span>Escolher um arquivo .prof</span>
+        </span>
+        <span class="welcome-card-arrow">→</span>
+      </button>
       <button class="welcome-card primary" id="welcomeNewFile" type="button">
-        <span class="welcome-card-icon">+</span>
+        <span class="welcome-card-icon" aria-hidden="true">+</span>
         <span class="welcome-card-copy">
           <strong>Criar novo arquivo</strong>
           <span>Começar um novo espaço</span>
         </span>
         <span class="welcome-card-arrow">→</span>
       </button>
-      <button class="welcome-card" id="welcomeOpenFile" type="button">
-        <span class="welcome-card-icon folder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7.5A2 2 0 0 1 5 5.5h5l2 2h7a2 2 0 0 1 2 2v7A2 2 0 0 1 19 18.5H5a2 2 0 0 1-2-2z"/><path d="M3.5 10h17"/></svg>
-        </span>
-        <span class="welcome-card-copy">
-          <strong>Abrir arquivo</strong>
-          <span>Continuar um espaço existente</span>
-        </span>
-        <span class="welcome-card-arrow">→</span>
-      </button>
-      <button class="welcome-card demo" id="welcomeDemo" type="button">
-        <span class="welcome-card-icon demo-icon"><span>✦</span></span>
-        <span class="welcome-card-copy">
-          <strong>Explorar demonstração</strong>
-          <span>Ver o ProfessorGest preenchido</span>
-        </span>
-        <span class="welcome-card-arrow">→</span>
-      </button>
     </div>
 
-    <div class="welcome-drive-action">
-      <button class="welcome-drive-link" id="welcomeDrive" type="button">
-        <span class="welcome-drive-icon">☁</span>
-        <span>Abrir do Google Drive</span>
-      </button>
-      <span>Use o mesmo arquivo no computador e no celular.</span>
-      <button class="welcome-install-link is-hidden" id="welcomeInstall" type="button">
-        <span class="welcome-install-icon">⌄</span>
-        <span>Instalar ProfessorGest</span>
-      </button>
+    <div class="welcome-recovery-slot"></div>
+
+    <div class="welcome-secondary">
+      <div class="welcome-secondary-label">Outras opções</div>
+      <div class="welcome-secondary-row">
+        <button class="welcome-secondary-action" id="welcomeDemo" type="button">
+          <span class="welcome-secondary-icon" aria-hidden="true">✦</span>
+          <span>Ver demonstração</span>
+        </button>
+        <button class="welcome-secondary-action" id="welcomeDrive" type="button">
+          <span class="welcome-secondary-icon" aria-hidden="true">☁</span>
+          <span>Google Drive</span>
+        </button>
+        <button class="welcome-secondary-action" id="welcomeBackups" type="button">
+          <span class="welcome-secondary-icon" aria-hidden="true">↺</span>
+          <span>Cópias de segurança</span>
+        </button>
+        <button class="welcome-secondary-action" id="welcomeSettings" type="button">
+          <span class="welcome-secondary-icon" aria-hidden="true">⚙</span>
+          <span>Configurações</span>
+        </button>
+        <button class="welcome-secondary-action is-hidden" id="welcomeInstall" type="button">
+          <span class="welcome-secondary-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 4v10.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+              <path d="m8.25 11.25 3.75 3.75 3.75-3.75" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M5 18.5h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>Instalar</span>
+        </button>
+      </div>
     </div>
+
     <div class="welcome-legal">
-      <span>O ProfessorGest funciona principalmente no seu dispositivo.</span>
-      <span class="welcome-legal-links"><a href="./privacidade.html">Política de Privacidade</a><a href="./termos.html">Termos de Serviço</a></span>
+      <span class="welcome-legal-links"><a href="./privacidade.html">Privacidade</a><a href="./termos.html">Termos</a></span>
     </div>
   </main>
 </div>
@@ -159,7 +205,7 @@
       </div>
     </div>
     <div class="nav-scroll" id="sidebar-nav"></div>
-    <button class="btn-primary quick-register" id="quickRegisterBtnDesktop">+ Registro rápido</button>
+    <button class="btn-primary quick-register" id="quickRegisterBtnDesktop">+ Registrar ocorrência</button>
   </aside>
 
   <!-- Main -->
@@ -167,13 +213,13 @@
     <header class="topbar">
       <div class="topbar-left">
         <div class="topbar-title-wrap">
-          <div class="topbar-title" id="viewTitle">Dashboard</div>
+          <div class="topbar-title" id="viewTitle">Início</div>
           <div class="topbar-save-status" id="topbarSaveStatus"></div>
         </div>
       </div>
       <button class="topbar-search" id="topbarSearchBtn" type="button" aria-label="Busca global (Ctrl+K)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <span>Buscar alunos, turmas, atividades...</span>
+        <span>Buscar no ProfessorGest...</span>
         <kbd>Ctrl K</kbd>
       </button>
       <div class="topbar-right">
@@ -195,12 +241,12 @@
   <!-- Floating quick register button (mobile) -->
   <button class="fab" id="quickRegisterBtnMobile" title="Registrar ocorrência" aria-label="Registrar ocorrência">+</button>
 
-  <!-- Modal / Command palette / Toast roots -->
-  <div id="modalRoot"></div>
-  <div id="cmdkRoot"></div>
-  <div class="toast-root" id="toastRoot"></div>
-
 </div>
+
+<!-- UI overlays remain outside #app so dialogs, alerts and toasts can also appear on the entry screen. -->
+<div id="modalRoot"></div>
+<div id="cmdkRoot"></div>
+<div class="toast-root" id="toastRoot"></div>
 
 <input type="file" id="fileInput" accept=".prof,.prof.json,.json,application/vnd.professorgest,application/json,text/plain,application/octet-stream" style="display:none">
 

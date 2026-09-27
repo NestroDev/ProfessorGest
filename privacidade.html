@@ -36,11 +36,11 @@
     </ul>
 
     <h2>2. Armazenamento no dispositivo</h2>
-    <p>Os projetos podem ser mantidos no armazenamento local do navegador, incluindo IndexedDB e armazenamento local do navegador. A cópia de recuperação automática também é mantida localmente para ajudar a evitar perda de trabalho.</p>
+    <p>Os projetos podem ser mantidos no armazenamento local do navegador, incluindo IndexedDB e armazenamento local do navegador. O ProfessorGest mantém também uma cópia de recuperação imediata e algumas cópias de segurança recentes no próprio dispositivo para ajudar a recuperar o trabalho caso uma alteração ou arquivo apresente algum problema.</p>
     <p>O ProfessorGest também pode criar arquivos <code>.prof</code> para exportação e abertura manual. Esses arquivos são controlados por você e podem conter todos os dados do seu projeto.</p>
 
     <h2>3. Google Drive e dados obtidos do Google</h2>
-    <p>A integração com o Google Drive é opcional. Quando você escolhe abrir ou salvar um projeto no Google Drive, o ProfessorGest utiliza a autorização do Google e, na configuração atual, solicita o escopo <code>https://www.googleapis.com/auth/drive.file</code>.</p>
+    <p>A integração com o Google Drive é opcional. Quando você escolhe abrir ou salvar um projeto no Google Drive, o ProfessorGest pede ao Google a autorização necessária para trabalhar com os arquivos que você escolher.</p>
     <p>Nessa situação, o aplicativo pode:</p>
     <ul>
       <li>permitir que você selecione, no seu próprio Google Drive, um arquivo de projeto usado pelo ProfessorGest;</li>
@@ -51,14 +51,14 @@
     <p>O conteúdo do projeto é enviado ao Google Drive somente como parte dessas ações solicitadas por você ou da sincronização automática do arquivo já vinculado ao projeto. O ProfessorGest não utiliza os dados do Google Drive para publicidade, não os vende e não os utiliza para criação de perfis de publicidade.</p>
     <p>O token de acesso recebido para a sessão do Google Drive não é gravado no arquivo <code>.prof</code> nem no armazenamento local do aplicativo. O aplicativo mantém localmente apenas os metadados necessários para reconhecer o arquivo vinculado, como identificador, nome, data de alteração e horário da última sincronização.</p>
 
-    <h2>4. Não existe um servidor próprio do ProfessorGest para os projetos</h2>
-    <p>O funcionamento descrito nesta versão não utiliza um backend próprio do ProfessorGest para receber e guardar os projetos dos usuários. O processamento principal acontece no navegador. Quando você usa o Google Drive, a transmissão e o armazenamento em nuvem passam a ocorrer nos serviços do Google, sujeitos às respectivas políticas do Google.</p>
+    <h2>4. Seus projetos não ficam em um servidor do ProfessorGest</h2>
+    <p>O ProfessorGest não mantém um servidor próprio para guardar seus projetos. O trabalho principal acontece no seu dispositivo. Quando você usa o Google Drive, a cópia em nuvem fica nos serviços do Google e segue as políticas do Google.</p>
 
-    <h2>5. Diagnóstico de erros</h2>
-    <p>O aplicativo mantém localmente um pequeno registro de erros técnicos para facilitar diagnóstico. Esse registro pode conter informações técnicas do navegador e do dispositivo, versão da aplicação, estado de conexão, endereço de origem/página e o nome do arquivo aberto, além da mensagem técnica do erro. O registro não é enviado automaticamente para um servidor do ProfessorGest. Ele só sai do dispositivo se você optar por exportá-lo.</p>
+    <h2>5. Ajuda e registros de problemas</h2>
+    <p>Para ajudar a identificar problemas, o ProfessorGest guarda no próprio dispositivo algumas informações sobre falhas que podem acontecer durante o uso. Essas informações não são enviadas automaticamente para o ProfessorGest. Se você precisar de ajuda, pode optar por baixá-las e enviá-las por conta própria.</p>
 
-    <h2>6. Cookies, analytics e publicidade</h2>
-    <p>O código atual do ProfessorGest não implementa cadastro próprio, mecanismo próprio de publicidade ou ferramenta própria de analytics. O site pode carregar recursos de terceiros, como fontes do Google Fonts, e esses provedores podem processar dados técnicos de acesso de acordo com suas próprias políticas.</p>
+    <h2>6. Cookies, estatísticas e publicidade</h2>
+    <p>O ProfessorGest não possui cadastro próprio, publicidade própria nem uma ferramenta própria para acompanhar seu uso. O site pode carregar recursos de terceiros, como fontes do Google Fonts, e esses provedores podem processar dados técnicos de acesso de acordo com suas próprias políticas.</p>
 
     <h2>7. Dados de alunos e responsabilidade do usuário</h2>
     <p>O ProfessorGest permite registrar dados pessoais e observações pedagógicas de alunos, inclusive informações que podem exigir cuidados especiais conforme a legislação aplicável. Você é responsável por utilizar o aplicativo de forma adequada, inserir apenas os dados necessários e observar as bases legais, autorizações, deveres de sigilo e demais requisitos aplicáveis ao seu contexto escolar.</p>
