@@ -59,7 +59,7 @@ test('pacote possui QA como gate de release', () => {
   assert.match(packageJson.scripts.check, /save-state\.js/);
   const buildMatch = app.match(/const APP_BUILD = '([^']+)'/);
   assert.equal(buildMatch?.[1], packageJson.version);
-  assert.equal(packageJson.version, '2026.09.27.31');
+  assert.equal(packageJson.version, '2026.09.28.03');
   const sourceModules = fs.readdirSync(path.join(root, 'src')).filter(name => name.endsWith('.js'));
   for (const module of sourceModules) {
     assert.match(sw, new RegExp(`\.\/src\/${module.replace('.', '\\.')}`), `Módulo ausente do shell: ${module}`);
