@@ -648,7 +648,9 @@ test('tela inicial tem uma única rotina de preparação por chamada', () => {
   const block = appSource.slice(start, end);
   assert.ok(start >= 0 && end > start);
   assert.equal(block.split("document.getElementById('welcomeScreen')?.classList.remove('is-hidden')").length - 1, 1);
-  assert.equal((block.match(/hydrateRecoveryCache\(\)\.then\(\(\) => renderWelcomeRecovery\(\)\)/g) || []).length, 1);
+  assert.match(block, /await hydrateRecoveryCache\(\);/);
+  assert.match(block, /await renderWelcomeRecovery\(\);/);
+  assert.doesNotMatch(block, /hydrateRecoveryCache\(\)\.then\(\(\) => renderWelcomeRecovery\(\)\)/);
 });
 
 test('cópias de segurança permanecem acessíveis mesmo quando ainda não existem', () => {

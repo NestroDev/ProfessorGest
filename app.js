@@ -1700,7 +1700,7 @@ function openWelcomeSettingsModal() {
 }
 
 async function showWelcomeScreen({ withLoading = true } = {}) {
-  const loadingStartedAt = withLoading ? beginAppLoading('Preparando a tela inicial...') : null;
+  const loadingStartedAt = withLoading ? beginAppLoading('Carregando seus dados...') : null;
   try {
     workspaceReady = false;
     demoMode = false;
@@ -1712,8 +1712,19 @@ async function showWelcomeScreen({ withLoading = true } = {}) {
     document.getElementById('welcomeScreen')?.classList.remove('is-hidden');
     document.getElementById('setupScreen')?.classList.add('is-hidden');
     updateThemeToggle();
-    renderWelcomeRecovery();
-    hydrateRecoveryCache().then(() => renderWelcomeRecovery()).catch(() => {});
+
+    // O conteúdo de recuperação/projetos é assíncrono (IndexedDB). Nunca
+    // mostre a tela inicial antes de terminar essa leitura, caso contrário
+    // o usuário vê a interface "montando" depois que o splash some.
+    setBootStatus('Carregando seus dados...');
+    await hydrateRecoveryCache();
+
+    setBootStatus('Preparando a tela inicial...');
+    await renderWelcomeRecovery();
+    await updateWelcomeBackupAction();
+
+    // Aguarda os elementos visuais realmente utilizados pela primeira tela.
+    await waitForInitialVisuals();
   } finally {
     if (loadingStartedAt !== null) await finishAppLoading(loadingStartedAt);
   }
@@ -1962,6 +1973,32 @@ async function waitForMinimumBootDuration(startedAt) {
   await new Promise(resolve => window.setTimeout(resolve, remaining));
 }
 
+async function waitForInitialVisuals() {
+  const waits = [];
+
+  // Aguarda as fontes usadas pela primeira tela, sem impor um timeout
+  // artificial que faria o conteúdo aparecer antes de estar pronto.
+  if (document.fonts?.ready) {
+    waits.push(Promise.resolve(document.fonts.ready).catch(() => {}));
+  }
+
+  // Aguarda imagens já presentes no documento. Isso evita a troca tardia
+  // de tamanho/forma quando logos ou ícones terminam de carregar.
+  const images = Array.from(document.images || []);
+  waits.push(Promise.all(images.map(img => {
+    if (img.complete) {
+      return img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+    }
+    return new Promise(resolve => {
+      const done = () => resolve();
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+  })));
+
+  await Promise.all(waits);
+}
+
 function beginAppLoading(message = 'Carregando...') {
   const screen = document.getElementById('appBootScreen');
   const startedAt = performance.now();
@@ -2011,15 +2048,12 @@ async function startApp() {
   setBootStatus('Preparando o ProfessorGest...');
   initGoogleDriveSdk();
   registerPwa();
+
+  // O splash só termina depois que a primeira tela e seus dados locais
+  // estiverem prontos. A duração mínima de 1,2 s continua sendo aplicada
+  // por finishAppBoot(), evitando flashes/efeitos de "interface montando".
   await showWelcomeScreen({ withLoading: false });
 
-  // Aguarda a primeira pintura útil para evitar o efeito de "interface montando".
-  try {
-    await Promise.race([
-      document.fonts?.ready || Promise.resolve(),
-      new Promise(resolve => setTimeout(resolve, 700)),
-    ]);
-  } catch (_) {}
   await new Promise(requestAnimationFrame);
   await new Promise(requestAnimationFrame);
   await finishAppBoot();
