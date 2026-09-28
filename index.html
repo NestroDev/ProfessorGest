@@ -259,5 +259,36 @@
      No artefato publicado ele é sempre substituído por um stub sem segredos. -->
 <script src="google-drive-config.local.js"></script>
 <script type="module" src="app.js"></script>
+
+    <button class="project-about-button" id="projectAboutButton" type="button"
+      aria-controls="projectInfoModal" aria-expanded="false">
+      Sobre o projeto
+    </button>
+
+    <div class="project-info-modal" id="projectInfoModal" aria-hidden="true">
+      <div class="project-info-backdrop" data-project-info-close></div>
+      <section class="project-info-card" role="dialog" aria-modal="true"
+        aria-labelledby="projectInfoTitle">
+        <button class="project-info-close" type="button" data-project-info-close
+          aria-label="Fechar">×</button>
+        <div class="project-info-kicker">PROJETO</div>
+        <h2 id="projectInfoTitle">ProfessorGest</h2>
+        <p class="project-info-description">
+          Plataforma de gestão pedagógica para professores.
+        </p>
+
+        <div class="project-team">
+          <div class="project-team-heading">Envolvidos no projeto</div>
+          <div class="project-team-member">
+            <div class="project-team-avatar" aria-hidden="true">M</div>
+            <div>
+              <strong>Murilo Fernandes Garcia</strong>
+              <span>Desenvolvimento do projeto</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
 </body>
 </html>

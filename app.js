@@ -32,7 +32,7 @@ import { studentsOf as selectStudentsOf, occurrencesOf as selectOccurrencesOf, a
    através de um arquivo .prof (JSON por dentro).
 ================================================================= */
 
-const APP_BUILD = '2026.09.27.31';
+const APP_BUILD = '2026.09.28.03';
 const DEV_LOG_KEY = 'professorgest-dev-log-v2';
 const DEV_LOG_LEGACY_KEYS = ['professorgest-dev-log-v1'];
 const DEV_LOG_MAX_ENTRIES = 50;
@@ -2044,6 +2044,7 @@ async function startApp() {
   loadDriveBinding();
   buildNav();
   bindGlobalEvents();
+  bindProjectInfo();
   bindSetupEvents();
   setBootStatus('Preparando o ProfessorGest...');
   initGoogleDriveSdk();
@@ -2078,6 +2079,33 @@ window.addEventListener('beforeunload', (e) => {
 
 window.addEventListener('pagehide', () => { if (isDirty) persistLocalRecoveryDraft(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && isDirty) persistLocalRecoveryDraft(); });
+
+function bindProjectInfo() {
+  const button = document.getElementById('projectAboutButton');
+  const modal = document.getElementById('projectInfoModal');
+  if (!button || !modal) return;
+
+  const setOpen = (open) => {
+    modal.classList.toggle('is-open', open);
+    modal.setAttribute('aria-hidden', String(!open));
+    button.setAttribute('aria-expanded', String(open));
+    if (open) {
+      modal.querySelector('.project-info-close')?.focus();
+    } else {
+      button.focus();
+    }
+  };
+
+  button.addEventListener('click', () => setOpen(true));
+  modal.querySelectorAll('[data-project-info-close]').forEach(el => {
+    el.addEventListener('click', () => setOpen(false));
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+      setOpen(false);
+    }
+  });
+}
 
 function bindGlobalEvents() {
   document.getElementById('welcomeNewFile').onclick = () => beginNewProjectSetup(false);
