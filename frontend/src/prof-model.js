@@ -13,7 +13,6 @@ export const PROF_MIME = 'application/vnd.professorgest';
 
 const OCCURRENCE_TYPES = new Set([
   'nao_atividade',
-  'nao_entregou',
   'conversou',
   'faltou',
   'participou',
@@ -67,17 +66,12 @@ function uniqueIds(items) {
   return true;
 }
 
-function validateCompletions(completions) {
-  if (completions == null) return {};
-  if (typeof completions !== 'object' || Array.isArray(completions)) return null;
-  const out = {};
-  for (const [sid, value] of Object.entries(completions)) {
-    if (!isSafeId(sid)) return null;
-    if (value !== 'delivered' && value !== 'not_delivered' && value !== 'pending') return null;
-    out[sid] = value;
+function legacyCompletionWarning(activity, warnings) {
+  if (activity && activity.completions && typeof activity.completions === 'object') {
+    warnings.push(`atividade ${activity.name || activity.id}: marcações de entrega legadas ignoradas`);
   }
-  return out;
 }
+
 export function validateProjectData(input) {
   const data = input;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'invalid' };
@@ -151,19 +145,7 @@ export function validateProjectData(input) {
     const classId = a.classId == null || a.classId === '' ? null : String(a.classId);
     if (classId && !classIds.has(classId)) warnings.push(`atividade ${a.name || a.id}: turma inexistente`);
     if (!isValidISODate(a.dueDate)) invalidRequiredDates.push(`Atividade: ${a.name || a.id}`);
-
-    const completions = validateCompletions(a.completions);
-    if (completions === null) {
-      invalidRequiredDates.push(`Atividade: ${a.name || a.id} possui completions inválidos`);
-    }
-    const safeCompletions = {};
-    Object.keys(completions || {}).forEach(sid => {
-      if (!studentIds.has(sid)) {
-        warnings.push(`atividade ${a.name || a.id}: completion para aluno inexistente`);
-        return;
-      }
-      safeCompletions[sid] = completions[sid];
-    });
+    legacyCompletionWarning(a, warnings);
 
     return {
       id: String(a.id),
@@ -171,7 +153,6 @@ export function validateProjectData(input) {
       classId: classId && classIds.has(classId) ? classId : null,
       dueDate: String(a.dueDate || ''),
       description: textField(a.description),
-      completions: safeCompletions,
     };
   });
 
@@ -214,7 +195,7 @@ export function validateProjectData(input) {
   }).filter(plan => isSafeId(plan.id));
 
   if (invalidRequiredDates.length) {
-    details.push(...invalidRequiredDates.slice(0, 8).map(item => item.includes('possui completions inválidos') ? item : `${item} possui data inválida`));
+    details.push(...invalidRequiredDates.slice(0, 8).map(item => `${item} possui data inválida`));
     return { ok: false, error: 'integrity', details, warnings };
   }
 

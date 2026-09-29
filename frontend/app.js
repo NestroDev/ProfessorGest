@@ -14,6 +14,7 @@ import {
   readTextFileUtf8, profOpenPickerTypes, profSavePickerTypes, supportsFileShare, shareFile, downloadTextFile
 } from './src/file-io.js';
 import { driveFetch as driveHttpFetch, driveJson as driveHttpJson, driveText as driveHttpText } from './src/drive-http.js';
+import { apiClient } from './src/services/api-client.js';
 import { createNavigationController } from './src/ui-navigation.js';
 import { transitionSaveState } from './src/save-state.js';
 import { createCoreViewRenderers } from './src/views-core.js';
@@ -25,14 +26,14 @@ import { createFileSettingsRenderers } from './src/views-file-settings.js';
 import { createClassViewRenderers } from './src/views-class.js';
 import { createWelcomeViewRenderer } from './src/views-welcome.js';
 import { createPlanningViewRenderer } from './src/views-planning.js';
-import { studentsOf as selectStudentsOf, occurrencesOf as selectOccurrencesOf, activitiesOf as selectActivitiesOf, classById as selectClassById, studentById as selectStudentById, activeClasses as selectActiveClasses, activeStudents as selectActiveStudents, activeActivities as selectActiveActivities, getDeliveryState as selectDeliveryState, studentStats as selectStudentStats, classStats as selectClassStats, activityStats as selectActivityStats, activityStatus as selectActivityStatus } from './src/project-selectors.js';
+import { studentsOf as selectStudentsOf, occurrencesOf as selectOccurrencesOf, activitiesOf as selectActivitiesOf, classById as selectClassById, studentById as selectStudentById, activeClasses as selectActiveClasses, activeStudents as selectActiveStudents, activeActivities as selectActiveActivities, studentStats as selectStudentStats, classStats as selectClassStats, activityStats as selectActivityStats, activityStatus as selectActivityStatus } from './src/project-selectors.js';
 
 /* ==================== ProfessorGest ====================
-   HTML + CSS + JS puro, sem backend. Dados em memória, salvos/abertos
-   através de um arquivo .prof (JSON por dentro).
+   PWA local-first. O arquivo .prof continua sendo a fonte de dados do
+   usuário; a API é opcional e fica isolada pelo cliente central.
 ================================================================= */
 
-const APP_BUILD = '2026.09.28.03';
+const APP_BUILD = '2026.09.28.2';
 const DEV_LOG_KEY = 'professorgest-dev-log-v2';
 const DEV_LOG_LEGACY_KEYS = ['professorgest-dev-log-v1'];
 const DEV_LOG_MAX_ENTRIES = 50;
@@ -204,7 +205,7 @@ let ctx = {
   classId: null, studentId: null, activityId: null,
   classTab: 'visao', studentTab: 'visao',
   histFilter: 'todos', histMonth: '',
-  studentSearch: '', studentClassFilter: '', studentSituacao: '', studentSort: 'nome',
+  studentSearch: '', studentClassFilter: '', studentSort: 'nome',
   activityFilter: 'proximas', activityClassFilter: '',
   occClassFilter: '', occTypeFilter: '', occMonth: '',
   calMonth: todayYM(), calSelectedDay: null, calClassFilter: '',
@@ -216,13 +217,12 @@ let ctx = {
 };
 
 const OCCUR_TYPES = [
-  { key: 'nao_atividade',     label: 'Não fez atividade',        tone: 'red',   emoji: '🔴' },
-  { key: 'nao_entregou',      label: 'Não entregou trabalho',     tone: 'red',   emoji: '📄' },
-  { key: 'conversou',         label: 'Conversou durante a aula',  tone: 'amber', emoji: '💬' },
-  { key: 'faltou',            label: 'Faltou',                    tone: 'gray',  emoji: '🚫' },
-  { key: 'participou',        label: 'Participou da aula',        tone: 'green', emoji: '⭐' },
-  { key: 'bom_comportamento', label: 'Bom comportamento',         tone: 'green', emoji: '✅' },
-  { key: 'observacao',        label: 'Outra observação',          tone: 'blue',  emoji: '📝' },
+  { key: 'nao_atividade',     label: 'Não fez atividade',        tone: 'red' },
+  { key: 'conversou',         label: 'Conversou durante a aula',  tone: 'amber' },
+  { key: 'faltou',            label: 'Faltou',                    tone: 'gray' },
+  { key: 'participou',        label: 'Participou da aula',        tone: 'green' },
+  { key: 'bom_comportamento', label: 'Bom comportamento',         tone: 'green' },
+  { key: 'observacao',        label: 'Outra observação',          tone: 'blue' },
 ];
 
 const NAV_GROUPS = [
@@ -235,7 +235,7 @@ const NAV_GROUPS = [
   ]},
   { label: 'Aulas', items: [
     { key: 'atividades', label: 'Atividades', icon: 'clipboard' },
-    { key: 'planejamento', label: 'Planejamento', icon: 'calendar' },
+    { key: 'planejamento', label: 'Planejamento', icon: 'notebook' },
     { key: 'calendario', label: 'Calendário', icon: 'calendar' },
   ]},
   { label: 'Acompanhamento', items: [
@@ -248,13 +248,21 @@ const NAV_GROUPS = [
   ]},
 ];
 const NAV_ITEMS = NAV_GROUPS.flatMap(g => g.items);
-const MOBILE_NAV_KEYS = ['dashboard', 'turmas', 'alunos', 'atividades', 'ocorrencias'];
+// No celular, a navegação organiza as telas por contexto de trabalho.
+const MOBILE_NAV_ITEMS = [
+  { key: 'dashboard', label: 'Início', icon: 'home', views: ['dashboard'] },
+  { key: 'pessoas', label: 'Pessoas', icon: 'users', views: ['turmas', 'alunos'] },
+  { key: 'aulas', label: 'Aulas', icon: 'notebook', views: ['atividades', 'planejamento', 'calendario'] },
+  { key: 'acompanhamento', label: 'Acomp.', icon: 'bell', views: ['ocorrencias', 'relatorios'] },
+  { key: 'mais', label: 'Mais', icon: 'menu', views: ['arquivo', 'configuracoes'] },
+];
 
 const ICONS = {
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9"/></svg>',
   users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M22 20c0-2.6-2-4.8-4.7-5.5"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
   clipboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3a1 1 0 011-1h4a1 1 0 011 1v1"/><path d="M9 11h6M9 15h6"/></svg>',
+  notebook: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4.5h10.5A1.5 1.5 0 0 1 18 6v14H7.5A2.5 2.5 0 0 1 5 17.5v-11A2 2 0 0 1 7 4.5z"/><path d="M8 4.5V20M11 9h4M11 13h4"/><path d="M5 17.5A2.5 2.5 0 0 1 7.5 15H18"/></svg>',
   calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9a6 6 0 0112 0c0 4 1.5 5.5 1.5 6.5H4.5C4.5 14.5 6 13 6 9z"/><path d="M10 19a2 2 0 004 0"/></svg>',
   report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>',
@@ -268,6 +276,7 @@ const ICONS = {
   chevR: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg>',
   file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5"/></svg>',
   save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h11l3 3v13a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M8 4v5h7V4M8 14h8v6H8z"/></svg>',
+  saveAction: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>',
   cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18h10.2a4.8 4.8 0 00.6-9.56A6.5 6.5 0 005.1 9.7 4.2 4.2 0 007 18z"/></svg>',
   menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
@@ -280,6 +289,8 @@ const ICONS = {
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>',
   alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 17a1.6 1.6 0 001.4 2.4h16.2a1.6 1.6 0 001.4-2.4L13.7 3.9a1.6 1.6 0 00-2.8 0z"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M20 11a8 8 0 0 0-14.9-3.8L3 10"/><path d="M3 5v5h5"/><path d="M4 13a8 8 0 0 0 14.9 3.8L21 14"/><path d="M21 19v-5h-5"/></svg>',
+  arrowRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
 };
 
 let navigation = null;
@@ -293,7 +304,7 @@ const { openModal, closeModal, rerenderModalKeepFocus, showFileErrorModal, confi
 navigation = createNavigationController({
   navGroups: NAV_GROUPS,
   navItems: NAV_ITEMS,
-  mobileNavKeys: MOBILE_NAV_KEYS,
+  mobileNavItems: MOBILE_NAV_ITEMS,
   icons: ICONS,
   queryAll: qAll,
   escapeHtml: esc,
@@ -309,7 +320,7 @@ navigation = createNavigationController({
   closeModal,
   driveBindingForCurrentProject,
 });
-const { buildNav, openMobileMenu, closeMobileMenu, navigate } = navigation;
+const { buildNav, openMobileMenu, closeMobileMenu, navigate, goBack, getPersistedRoute, clearPersistedRoute } = navigation;
 
 /* ==================== datas ==================== */
 
@@ -379,7 +390,7 @@ async function saveLocalProjectSnapshot({ stateData = null, storageMode = curren
   return true;
 }
 
-async function restorePersistedProjectById(projectId) {
+async function restorePersistedProjectById(projectId, { navigateToDashboard = true } = {}) {
   const record = await readLocalProjectRecordById(projectId);
   if (!record?.state || record.state.format !== PROF_FORMAT) return false;
 
@@ -400,6 +411,7 @@ async function restorePersistedProjectById(projectId) {
             storageMode: 'file',
             fileLastModified: file.lastModified,
             persistLocal: false,
+            navigateToDashboard,
             warnings: result.warnings || [],
           });
           return true;
@@ -415,6 +427,7 @@ async function restorePersistedProjectById(projectId) {
     fileLastModified: record.fileLastModified || 0,
     persistLocal: false,
     driveBinding: record.driveBinding || null,
+    navigateToDashboard,
     warnings: [],
   });
   return true;
@@ -425,10 +438,6 @@ async function restorePersistedProject() {
   return restorePersistedProjectById(records[0]?.state?.projectId || null);
 }
 
-function forgetPersistedProjectOnNewSession() {
-  localProjectSaved = false;
-  localProjectSavedAt = 0;
-}
 
 function markDirty() {
   dirtyRevision += 1;
@@ -773,7 +782,9 @@ function updateSaveChrome() {
     status.title = label;
   }
   if (action) {
-    action.innerHTML = `<button type="button" class="topbar-save-button" id="topbarSaveBtn" ${disabled ? 'disabled' : ''}>${ICONS.save}<span>${buttonLabel}</span></button>`;
+    const needsSaveAction = !disabled && (isDirty || (cloudSyncPending && !!driveBindingForCurrentProject()) || !currentFileName);
+    const buttonClass = `topbar-save-button${needsSaveAction ? ' needs-save' : ''}`;
+    action.innerHTML = `<button type="button" class="${buttonClass}" id="topbarSaveBtn" aria-label="${buttonLabel}" title="${buttonLabel}" ${disabled ? 'disabled' : ''}>${ICONS.saveAction}<span>${buttonLabel}</span></button>`;
     const btn = document.getElementById('topbarSaveBtn');
     if (btn) btn.onclick = savePrimaryAction;
   }
@@ -1307,20 +1318,6 @@ function openDrivePicker() {
   });
 }
 
-function openDriveSyncHelp() {
-  openModal(`
-    <div class="confirm-icon info">${ICONS.cloud}</div>
-    <div class="modal-title">Sincronização com Google Drive</div>
-    <p class="confirm-body">Você pode manter o mesmo arquivo do ProfessorGest no computador e no celular usando o Google Drive. O ProfessorGest continua funcionando localmente e o Drive fica opcional.</p>
-    <div class="cloud-steps">
-      <div><b>1</b><span>Conecte sua conta Google.</span></div>
-      <div><b>2</b><span>Salve este projeto no Drive.</span></div>
-      <div><b>3</b><span>No outro dispositivo, use “Abrir do Google Drive”.</span></div>
-    </div>
-    <div class="form-actions"><button type="button" class="btn-primary" id="modalCancel">Entendi</button></div>
-  `);
-}
-
 async function syncCurrentProjectToDrive({ force = false, silent = false, skipTokenRefresh = false } = {}) {
   if (driveSyncPromise) return driveSyncPromise;
   driveSyncPromise = (async () => {
@@ -1358,7 +1355,7 @@ function showDriveConflict(remoteMeta) {
       <li><span>Neste dispositivo</span><strong>${esc(currentFileName || 'Projeto atual')}</strong></li>
       <li><span>No Drive</span><strong>${esc(remoteMeta.name || currentFileName || 'Projeto')}</strong></li>
     </ul>
-    <div class="form-actions" style="flex-wrap:wrap;">
+    <div class="form-actions form-actions-wrap-mobile">
       <button type="button" class="btn-secondary" id="driveUseRemote">Usar versão do Drive</button>
       <button type="button" class="btn-primary" id="driveKeepLocal">Manter este dispositivo</button>
     </div>
@@ -1446,7 +1443,7 @@ function disconnectCurrentDriveFile() {
 
 function resetContext() {
   ctx = { ...ctx, classId: null, studentId: null, activityId: null, classTab: 'visao', studentTab: 'visao',
-    histFilter: 'todos', histMonth: '', studentSearch: '', studentClassFilter: '', studentSituacao: '', studentSort: 'nome',
+    histFilter: 'todos', histMonth: '', studentSearch: '', studentClassFilter: '', studentSort: 'nome',
     activityFilter: 'proximas', activityClassFilter: '', occClassFilter: '', occTypeFilter: '', occMonth: '',
     calMonth: todayYM(), calSelectedDay: null, calClassFilter: '', bulkMode: false, bulkSelected: new Set(), bulkContext: null,
     reportStudentId: null, reportFrom: '', reportTo: '', reportOpts: null, reportSynthesis: '', classReportId: null, classReportFrom: '', classReportTo: ''
@@ -1700,7 +1697,8 @@ function openWelcomeSettingsModal() {
 }
 
 async function showWelcomeScreen({ withLoading = true } = {}) {
-  const loadingStartedAt = withLoading ? beginAppLoading('Carregando seus dados...') : null;
+  clearPersistedRoute();
+  const loadingStartedAt = withLoading ? beginAppLoading('Preparando a tela inicial...') : null;
   try {
     workspaceReady = false;
     demoMode = false;
@@ -1712,19 +1710,8 @@ async function showWelcomeScreen({ withLoading = true } = {}) {
     document.getElementById('welcomeScreen')?.classList.remove('is-hidden');
     document.getElementById('setupScreen')?.classList.add('is-hidden');
     updateThemeToggle();
-
-    // O conteúdo de recuperação/projetos é assíncrono (IndexedDB). Nunca
-    // mostre a tela inicial antes de terminar essa leitura, caso contrário
-    // o usuário vê a interface "montando" depois que o splash some.
-    setBootStatus('Carregando seus dados...');
-    await hydrateRecoveryCache();
-
-    setBootStatus('Preparando a tela inicial...');
-    await renderWelcomeRecovery();
-    await updateWelcomeBackupAction();
-
-    // Aguarda os elementos visuais realmente utilizados pela primeira tela.
-    await waitForInitialVisuals();
+    renderWelcomeRecovery();
+    hydrateRecoveryCache().then(() => renderWelcomeRecovery()).catch(() => {});
   } finally {
     if (loadingStartedAt !== null) await finishAppLoading(loadingStartedAt);
   }
@@ -1798,6 +1785,36 @@ function exitDemoMode() {
   clearDirty();
   resetContext();
   showWelcomeScreen();
+}
+
+function closeCurrentFile() {
+  const close = () => {
+    if (isDirty) persistLocalRecoveryDraft();
+    state = null;
+    demoMode = false;
+    workspaceReady = false;
+    currentFileName = null;
+    currentFileHandle = null;
+    currentStorageMode = 'none';
+    currentFileLastModified = 0;
+    driveBinding = null;
+    cloudSyncPending = false;
+    clearDirty({ discardRecovery: false });
+    resetContext();
+    showWelcomeScreen();
+  };
+
+  if (isDirty) {
+    confirmModal({
+      title: 'Fechar arquivo?',
+      body: 'As alterações ainda não salvas ficarão protegidas neste dispositivo para você continuar depois. O arquivo .prof original não será alterado.',
+      detailList: [['Arquivo atual', currentFileName || 'Novo projeto'], ['Próxima tela', 'Abertura de arquivo']],
+      confirmLabel: 'Fechar arquivo',
+      onConfirm: close,
+    });
+    return;
+  }
+  close();
 }
 
 function beginNewProjectSetup(fromWorkspace = false) {
@@ -1973,32 +1990,6 @@ async function waitForMinimumBootDuration(startedAt) {
   await new Promise(resolve => window.setTimeout(resolve, remaining));
 }
 
-async function waitForInitialVisuals() {
-  const waits = [];
-
-  // Aguarda as fontes usadas pela primeira tela, sem impor um timeout
-  // artificial que faria o conteúdo aparecer antes de estar pronto.
-  if (document.fonts?.ready) {
-    waits.push(Promise.resolve(document.fonts.ready).catch(() => {}));
-  }
-
-  // Aguarda imagens já presentes no documento. Isso evita a troca tardia
-  // de tamanho/forma quando logos ou ícones terminam de carregar.
-  const images = Array.from(document.images || []);
-  waits.push(Promise.all(images.map(img => {
-    if (img.complete) {
-      return img.decode ? img.decode().catch(() => {}) : Promise.resolve();
-    }
-    return new Promise(resolve => {
-      const done = () => resolve();
-      img.addEventListener('load', done, { once: true });
-      img.addEventListener('error', done, { once: true });
-    });
-  })));
-
-  await Promise.all(waits);
-}
-
 function beginAppLoading(message = 'Carregando...') {
   const screen = document.getElementById('appBootScreen');
   const startedAt = performance.now();
@@ -2044,17 +2035,30 @@ async function startApp() {
   loadDriveBinding();
   buildNav();
   bindGlobalEvents();
-  bindProjectInfo();
   bindSetupEvents();
   setBootStatus('Preparando o ProfessorGest...');
   initGoogleDriveSdk();
   registerPwa();
+  const savedRoute = getPersistedRoute();
+  let restored = false;
+  if (savedRoute?.projectId) {
+    restored = await restorePersistedProjectById(savedRoute.projectId, { navigateToDashboard: false });
+    if (restored) {
+      enterWorkspace();
+      navigation.restoreWorkspaceRoute(savedRoute);
+      render();
+    }
+  }
+  if (!restored) await showWelcomeScreen({ withLoading: false });
+  if (apiClient.enabled) apiClient.health().catch(err => console.warn('[ProfessorGest] API indisponível:', err));
 
-  // O splash só termina depois que a primeira tela e seus dados locais
-  // estiverem prontos. A duração mínima de 1,2 s continua sendo aplicada
-  // por finishAppBoot(), evitando flashes/efeitos de "interface montando".
-  await showWelcomeScreen({ withLoading: false });
-
+  // Aguarda a primeira pintura útil para evitar o efeito de "interface montando".
+  try {
+    await Promise.race([
+      document.fonts?.ready || Promise.resolve(),
+      new Promise(resolve => setTimeout(resolve, 700)),
+    ]);
+  } catch (_) {}
   await new Promise(requestAnimationFrame);
   await new Promise(requestAnimationFrame);
   await finishAppBoot();
@@ -2079,33 +2083,6 @@ window.addEventListener('beforeunload', (e) => {
 
 window.addEventListener('pagehide', () => { if (isDirty) persistLocalRecoveryDraft(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && isDirty) persistLocalRecoveryDraft(); });
-
-function bindProjectInfo() {
-  const button = document.getElementById('projectAboutButton');
-  const modal = document.getElementById('projectInfoModal');
-  if (!button || !modal) return;
-
-  const setOpen = (open) => {
-    modal.classList.toggle('is-open', open);
-    modal.setAttribute('aria-hidden', String(!open));
-    button.setAttribute('aria-expanded', String(open));
-    if (open) {
-      modal.querySelector('.project-info-close')?.focus();
-    } else {
-      button.focus();
-    }
-  };
-
-  button.addEventListener('click', () => setOpen(true));
-  modal.querySelectorAll('[data-project-info-close]').forEach(el => {
-    el.addEventListener('click', () => setOpen(false));
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && modal.classList.contains('is-open')) {
-      setOpen(false);
-    }
-  });
-}
 
 function bindGlobalEvents() {
   document.getElementById('welcomeNewFile').onclick = () => beginNewProjectSetup(false);
@@ -2240,18 +2217,10 @@ function initials(name) { return name.split(' ').filter(Boolean).slice(0, 2).map
 function activeClasses() { return selectActiveClasses(state); }
 function activeStudents() { return selectActiveStudents(state); }
 function activeActivities() { return selectActiveActivities(state); }
-function getDeliveryState(activity, studentId) { return selectDeliveryState(activity, studentId); }
 function studentStats(s) { return selectStudentStats(state, s, todayISO); }
 function classStats(c) { return selectClassStats(state, c, todayISO); }
 function activityStats(a) { return selectActivityStats(state, a); }
 function activityStatus(a) { return selectActivityStatus(state, a, todayISO); }
-
-function situacaoAluno(s) {
-  const st = studentStats(s);
-  if (st.pend >= 3) return { key: 'critico', label: 'Muitas pendências', tone: 'red' };
-  if (st.pend > 0) return { key: 'pendencia', label: 'Com pendências', tone: 'amber' };
-  return { key: 'ok', label: 'Em dia', tone: 'green' };
-}
 
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -2260,23 +2229,13 @@ function emptyState(msg, sub) {
   return `<div class="empty-state"><div class="empty-title">${esc(msg)}</div>${sub ? `<div>${esc(sub)}</div>` : ''}</div>`;
 }
 function badgeFor(typeKey) {
-  const t = OCCUR_TYPES.find(x => x.key === typeKey) || { label: typeKey, tone: 'gray', emoji: '' };
-  return `<span class="badge badge-${t.tone}">${t.emoji} ${t.label}</span>`;
-}
-function deliveryBadge(st) {
-  if (st === 'delivered') return '<span class="badge badge-green">✅ Entregou</span>';
-  if (st === 'not_delivered') return '<span class="badge badge-red">❌ Não entregou</span>';
-  return '<span class="badge badge-gray">◯ Não verificado</span>';
-}
-function progressBarHTML(pct, extraClass) {
-  const cls = pct >= 80 ? '' : pct >= 50 ? 'warn' : 'danger';
-  return `<div class="progress-track"><div class="progress-fill ${extraClass || cls}" style="width:${pct}%"></div></div>`;
+  const t = OCCUR_TYPES.find(x => x.key === typeKey) || { label: typeKey, tone: 'gray' };
+  return `<span class="badge badge-${t.tone}"><span class="badge-symbol" aria-hidden="true">${ICONS.bell}</span><span>${t.label}</span></span>`;
 }
 
 const studentActivityRenderers = createStudentActivityRenderers({
   getState: () => state, getCtx: () => ctx, esc, initials, classNameOf, studentStats, activityStats, activityStatus,
-  situacaoAluno, occurrencesOf, activitiesOf, getDeliveryState, deliveryBadge,
-  progressBarHTML, emptyState, fmtDate, monthLabel, badgeFor, todayISO, ICONS
+  occurrencesOf, activitiesOf, emptyState, fmtDate, monthLabel, badgeFor, todayISO, ICONS
 });
 
 function renderWelcomeRecovery() {
@@ -2316,7 +2275,7 @@ function activitiesInMonth(ym) { return calendarOccurrenceRenderers.activitiesIn
 
 const reportRenderers = createReportRenderers({
   getState: () => state, getCtx: () => ctx, esc, classNameOf, studentById, studentsOf, activitiesOf, occurrencesOf,
-  getDeliveryState, todayISO, addDays, fmtDate, emptyState,
+  todayISO, addDays, fmtDate, emptyState,
   timelineEntriesHTML: studentActivityRenderers.timelineEntriesHTML,
   studentTimelineEntries: studentActivityRenderers.studentTimelineEntries,
   occurrenceTypes: OCCUR_TYPES, ICONS
@@ -2341,7 +2300,7 @@ const planningViewRenderer = createPlanningViewRenderer({
 
 const classViewRenderers = createClassViewRenderers({
   getState: () => state, getCtx: () => ctx, classById, classStats, studentsOf, occurrencesOf, studentById,
-  situacaoAluno, initials, activityListItemHTML, esc, fmtDate, todayISO, emptyState, badgeFor, ICONS
+  initials, activityListItemHTML, esc, fmtDate, todayISO, emptyState, badgeFor, ICONS
 });
 
 const welcomeViewRenderer = createWelcomeViewRenderer({
@@ -2354,6 +2313,7 @@ const welcomeViewRenderer = createWelcomeViewRenderer({
   updateWelcomeExperience,
   toast,
   escapeHtml: esc,
+  ICONS,
 });
 
 
@@ -2365,43 +2325,21 @@ function renderClassStudentsTab(c) { return classViewRenderers.renderClassStuden
 function attentionItems() {
   const items = [];
   const today = todayISO();
-  const overdueActs = activeActivities().filter(a => a.dueDate < today).filter(a => {
-    const st = activityStats(a);
-    return st.notDelivered + st.pending > 0;
-  }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  overdueActs.slice(0, 3).forEach(a => {
-    const st = activityStats(a);
-    items.push({ tone: 'red', title: `${a.name} está atrasada`,
-      sub: `${classNameOf(a.classId)} · ${st.notDelivered + st.pending} aluno(s) sem entrega confirmada`,
-      action: () => { ctx.activityId = a.id; navigate('atividadeDetail', false); } });
+  (state.plans || []).filter(p => p.date === today).slice(0, 2).forEach(plan => {
+    items.push({ tone: 'blue', title: `Planejamento de hoje: ${plan.title}`, sub: `${classNameOf(plan.classId)} · ${fmtDate(plan.date)}`, action: () => navigate('planejamento') });
   });
-
-  const dueSoon = activeActivities().filter(a => a.dueDate >= today && a.dueDate <= addDays(3))
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  dueSoon.slice(0, 3).forEach(a => {
-    items.push({ tone: 'amber', title: `${a.name} vence em breve`,
-      sub: `${classNameOf(a.classId)} · entrega ${fmtDate(a.dueDate)}`,
-      action: () => { ctx.activityId = a.id; navigate('atividadeDetail', false); } });
+  activeActivities().filter(a => a.dueDate >= today && a.dueDate <= addDays(3)).sort((a,b) => a.dueDate.localeCompare(b.dueDate)).slice(0,3).forEach(a => {
+    items.push({ tone: 'amber', title: `${a.name} acontece em breve`, sub: `${classNameOf(a.classId)} · ${fmtDate(a.dueDate)}`, action: () => { ctx.activityId = a.id; navigate('atividadeDetail', false); } });
   });
-
-  const criticos = activeStudents().filter(s => studentStats(s).pend >= 3);
-  criticos.slice(0, 3).forEach(s => {
-    const st = studentStats(s);
-    items.push({ tone: 'red', title: `${s.name} tem ${st.pend} pendências`,
-      sub: `${classNameOf(s.classId)} · acompanhar entregas e ocorrências`,
-      action: () => { ctx.studentId = s.id; ctx.studentTab = 'visao'; navigate('alunoDetail', false); } });
+  const recentOcc = (state.occurrences || []).filter(o => o.date >= addDays(-7)).sort((a,b) => b.date.localeCompare(a.date));
+  recentOcc.slice(0, 3).forEach(o => {
+    const student = studentById(o.studentId);
+    if (!student) return;
+    items.push({ tone: 'red', title: `Registro recente: ${student.name}`, sub: `${classNameOf(student.classId)} · ${fmtDate(o.date)} · ${OCCUR_TYPES.find(t => t.key === o.type)?.label || o.type}`, action: () => { ctx.studentId = student.id; ctx.studentTab = 'historico'; navigate('alunoDetail', false); } });
   });
-
-  const activeStudentIds = new Set(activeStudents().map(s => s.id));
-  const recentOcc = state.occurrences.filter(o => activeStudentIds.has(o.studentId) && o.date >= addDays(-3) && (o.type === 'nao_atividade' || o.type === 'nao_entregou' || o.type === 'faltou'));
-  recentOcc.slice(0, 2).forEach(o => {
-    const s = studentById(o.studentId);
-    if (!s) return;
-    items.push({ tone: 'blue', title: `Novo registro para ${s.name}`,
-      sub: `${fmtDate(o.date)} · ${OCCUR_TYPES.find(t => t.key === o.type)?.label || o.type}`,
-      action: () => { ctx.studentId = s.id; ctx.studentTab = 'historico'; navigate('alunoDetail', false); } });
+  activeActivities().filter(a => a.dueDate < today).sort((a,b) => b.dueDate.localeCompare(a.dueDate)).slice(0,2).forEach(a => {
+    items.push({ tone: 'blue', title: `${a.name} já passou`, sub: `${classNameOf(a.classId)} · ${fmtDate(a.dueDate)} · confira seus registros se necessário`, action: () => { ctx.activityId = a.id; navigate('atividadeDetail', false); } });
   });
-
   return items.slice(0, 6);
 }
 
@@ -2412,7 +2350,7 @@ const coreViewRenderers = createCoreViewRenderers({
   activeStudents, activeActivities, activeClasses,
   classStats, activityStats, studentById, classNameOf,
   attentionItems, todayISO, greeting, esc, fmtDate,
-  emptyState, progressBarHTML, badgeFor, ICONS
+  emptyState, badgeFor, ICONS
 });
 
 function renderDashboard() { return coreViewRenderers.renderDashboard(); }
@@ -2455,7 +2393,7 @@ function openIndividualReportConfig(presetStudentId) {
   ctx.reportStudentId = presetStudentId || ctx.reportStudentId || (state.students[0] && state.students[0].id) || null;
   ctx.reportFrom = ctx.reportFrom || addDays(-60);
   ctx.reportTo = ctx.reportTo || todayISO();
-  ctx.reportOpts = ctx.reportOpts || { resumo: true, atividades: true, entregas: true, naoEntregas: true, ocorrencias: true, observacoes: true, linha: true };
+  ctx.reportOpts = ctx.reportOpts || { resumo: true, atividades: true, ocorrencias: true, observacoes: true, linha: true };
   openModal(`
     <div class="modal-title">Relatório individual do aluno</div>
     <form id="reportConfigForm">
@@ -2465,9 +2403,9 @@ function openIndividualReportConfig(presetStudentId) {
         <div class="form-group"><label class="form-label" for="reportFrom">Período — de</label><input class="form-input" id="reportFrom" type="date" name="from" value="${ctx.reportFrom}"></div>
         <div class="form-group"><label class="form-label" for="reportTo">até</label><input class="form-input" id="reportTo" type="date" name="to" value="${ctx.reportTo}"></div>
       </div>
-      <fieldset class="form-group" style="border:0;padding:0;"><legend class="form-label">Incluir no relatório</legend>
-        ${reportOptCheckbox('resumo', 'Resumo')}${reportOptCheckbox('atividades', 'Atividades')}${reportOptCheckbox('entregas', 'Entregas')}
-        ${reportOptCheckbox('naoEntregas', 'Não entregas')}${reportOptCheckbox('ocorrencias', 'Ocorrências')}${reportOptCheckbox('observacoes', 'Observações')}${reportOptCheckbox('linha', 'Linha do tempo')}
+      <fieldset class="form-group report-options-fieldset"><legend class="form-label">Incluir no relatório</legend>
+        ${reportOptCheckbox('resumo', 'Resumo')}${reportOptCheckbox('atividades', 'Atividades')}
+        ${reportOptCheckbox('ocorrencias', 'Ocorrências')}${reportOptCheckbox('observacoes', 'Observações')}${reportOptCheckbox('linha', 'Linha do tempo')}
       </fieldset>
       <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn-primary">Visualizar relatório</button></div>
     </form>
@@ -2604,7 +2542,7 @@ function applyOpenedData(data, fileName, cloudMeta = null, fileHandle = null, op
   discardLocalRecoveryDraft();
   resetContext();
   enterWorkspace();
-  navigate('dashboard');
+  if (options.navigateToDashboard !== false) navigate('dashboard', true, { replace: true });
   const warnings = Array.isArray(options.warnings) ? options.warnings : [];
   if (warnings.length) {
     isDirty = true;
@@ -2662,6 +2600,7 @@ async function openFile(skipConfirm = false) {
             storageMode: 'file',
             fileLastModified: file.lastModified,
             persistLocal: true,
+            navigateToDashboard,
             warnings: result.warnings || [],
           });
           return true;
@@ -2718,12 +2657,6 @@ async function handleFileOpenInput(e) {
   if (openError) showFileErrorModal(openError.message, openError.details || []);
 }
 
-function profDownloadName(filename) {
-  // Mantemos apenas ".prof" (sem sufixo extra). O fallback usa um MIME próprio
-  // do formato, evitando que Android/Chrome o trate como JSON por extensão.
-  return normalizeProfFileName(filename);
-}
-
 async function shareFileFallback(content, filename, mime) {
   try {
     return await shareFile(content, filename, mime);
@@ -2746,10 +2679,13 @@ function downloadFallback(content, filename, mime) {
 async function shareCurrentProfFile() {
   if (demoMode || !state) return false;
   const payload = buildSavePayload();
-  await createAutomaticBackup('Antes de salvar');
   const json = JSON.stringify(payload, null, 2);
   const name = normalizeProfFileName(currentFileName || `professorgest-${safeFileName(state?.teacher?.name || 'professorgest')}.prof`);
-  const shared = await shareFileFallback(json, name, PROF_MIME);
+  const sharePromise = shareFileFallback(json, name, PROF_MIME);
+  createAutomaticBackup('Antes de compartilhar').catch(err => {
+    logError('file.share.backup_failed', err, { filename: name });
+  });
+  const shared = await sharePromise;
   if (shared) { toast('Arquivo .prof compartilhado com sucesso.', 'success'); return true; }
   toast('O compartilhamento de arquivos não está disponível neste navegador. Use Exportar cópia .prof.', 'info');
   return false;
@@ -2996,8 +2932,8 @@ async function saveFile({ fromPrimarySave = false, forceOverwrite = false, skipC
 
 /* ==================== MODAIS: formulários ==================== */
 
-function classOptions(selectedId) {
-  return state.classes.map(c => `<option value="${esc(c.id)}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+function classOptions(selectedId = '') {
+  return `<option value="" ${selectedId ? '' : 'selected'}>Sem turma / definir depois</option>` + state.classes.filter(c => !c.archived || c.id === selectedId).map(c => `<option value="${esc(c.id)}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
 }
 
 function openClassModal(existing) {
@@ -3051,9 +2987,9 @@ function openActivityModal(existing, presetClassId) {
       <div class="form-group"><label class="form-label" for="activityNameInput">Nome da atividade</label>
         <input class="form-input" id="activityNameInput" name="name" required value="${existing ? esc(existing.name) : ''}" placeholder="Ex: Lista de exercícios"></div>
       <div class="form-group"><label class="form-label" for="studentClassInput">Turma</label><select class="form-select" id="studentClassInput" name="classId">${classOptions(existing ? existing.classId : (presetClassId || ctx.classId))}</select></div>
-      <div class="form-group"><label class="form-label" for="activityDueDateInput">Data de entrega</label><input class="form-input" id="activityDueDateInput" type="date" name="dueDate" required value="${existing ? existing.dueDate : todayISO()}"></div>
+      <div class="form-group"><label class="form-label" for="activityDueDateInput">Data da atividade</label><input class="form-input" id="activityDueDateInput" type="date" name="dueDate" required value="${existing ? existing.dueDate : todayISO()}"></div>
       <div class="form-group"><label class="form-label" for="activityDescriptionInput">Descrição</label><textarea class="form-textarea" id="activityDescriptionInput" name="description" placeholder="Opcional">${existing ? esc(existing.description || '') : ''}</textarea></div>
-      ${existing ? '<p class="form-hint">As marcações de entrega já registradas serão mantidas.</p>' : ''}
+      <p class="form-hint">Atividades organizam a agenda da turma. O acompanhamento individual é feito por ocorrências e observações.</p>
       <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button>
         <button type="submit" class="btn-primary">${existing ? 'Salvar alterações' : 'Criar atividade'}</button></div>
     </form>
@@ -3154,26 +3090,40 @@ function openOccurrenceStep1(searchTerm, presetClassId = '') {
     <div class="modal-title">Registrar ocorrência</div>
     <div class="form-group"><label class="form-label" for="quickSearchInput">Quem?</label>
       <input class="form-input input-search" id="quickSearchInput" placeholder="Pesquisar aluno..." value="${esc(searchTerm || '')}"></div>
-    <div class="list-card" id="quickStudentList" style="max-height:280px;overflow-y:auto;">
+    <div class="list-card quick-student-list" id="quickStudentList">
       ${list.map(s => `<div class="list-item"><div class="list-item-main" data-pick-student="${esc(s.id)}" role="button" tabindex="0">
-        <div class="list-item-title">${esc(s.name)}</div><div class="list-item-sub">${esc(classNameOf(s.classId))}</div></div></div>`).join('') || emptyState('Nenhum aluno encontrado.')}
+        <div class="list-item-title">${esc(s.name)}</div><div class="list-item-sub">${esc(classNameOf(s.classId))}</div></div></div>`).join('') || emptyState(term ? 'Nenhum aluno encontrado.' : 'Nenhum aluno acompanhado ainda.')}
     </div>
+    <div class="quick-add-student">${term ? `<button type="button" class="btn-secondary btn-sm" id="quickAddStudentBtn">${ICONS.plus} Adicionar “${esc(searchTerm.trim())}” como aluno</button>` : '<span class="form-hint">Adicione o aluno somente quando precisar acompanhá-lo.</span>'}</div>
     <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button></div>
   `);
   const input = document.getElementById('quickSearchInput');
   input.oninput = () => rerenderModalKeepFocus(() => openOccurrenceStep1(input.value, presetClassId));
+  onClick('#quickAddStudentBtn', () => openQuickAddStudentModal(searchTerm, presetClassId));
+}
+
+function openQuickAddStudentModal(suggestedName = '', presetClassId = '') {
+  openModal(`
+    <div class="modal-title">Adicionar aluno</div>
+    <p class="confirm-body">Adicione somente o aluno que você precisa acompanhar agora. Depois, continue o registro desta ocorrência.</p>
+    <form id="quickStudentCreateForm">
+      <div class="form-group"><label class="form-label" for="quickStudentName">Nome do aluno</label><input class="form-input" id="quickStudentName" name="name" required value="${esc(suggestedName)}"></div>
+      <div class="form-group"><label class="form-label" for="quickStudentClass">Turma</label><select class="form-select" id="quickStudentClass" name="classId">${classOptions(presetClassId)}</select></div>
+      <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Voltar</button><button type="submit" class="btn-primary">Adicionar e continuar</button></div>
+    </form>`);
 }
 
 function openOccurrenceStep2(studentIds, editingOcc) {
   const students = studentIds.map(studentById).filter(Boolean);
   if (!students.length) { openOccurrenceStep1(''); return; }
-  const opts = OCCUR_TYPES.map(t => `<button type="button" class="quick-opt ${editingOcc && editingOcc.type === t.key ? 'selected' : ''}" data-occ-type="${esc(t.key)}">${t.emoji} ${t.label}</button>`).join('');
+  const occurrenceIcons = { nao_atividade: ICONS.alert, conversou: ICONS.bell, faltou: ICONS.calendar, participou: ICONS.check, bom_comportamento: ICONS.check, observacao: ICONS.file };
+  const opts = OCCUR_TYPES.map(t => `<button type="button" class="quick-opt ${editingOcc && editingOcc.type === t.key ? 'selected' : ''}" data-occ-type="${esc(t.key)}"><span class="quick-opt-icon" aria-hidden="true">${occurrenceIcons[t.key] || ICONS.file}</span><span>${t.label}</span></button>`).join('');
   const multi = students.length > 1;
   openModal(`
     <div class="modal-title">${editingOcc ? 'Editar ocorrência' : 'O que aconteceu?'}</div>
-    <div class="list-item-sub" style="margin-bottom:12px;">
+    <div class="list-item-sub student-selection-summary">
       ${multi ? `Alunos selecionados: <strong>${students.length}</strong>` : `Aluno: <strong>${esc(students[0].name)}</strong>`}
-      ${(editingOcc || multi) ? '' : `<button type="button" class="btn-icon" id="changeStudentBtn" style="margin-left:6px;">trocar aluno</button>`}
+      ${(editingOcc || multi) ? '' : `<button type="button" class="btn-icon change-student-button" id="changeStudentBtn">trocar aluno</button>`}
     </div>
     <form id="occurForm">
       <input type="hidden" name="studentIds" value="${studentIds.join(',')}">
@@ -3205,12 +3155,25 @@ function bindModalEvents() {
     markDirty(); closeModal(); render();
   };
 
+  const quickStudentCreateForm = document.getElementById('quickStudentCreateForm');
+  if (quickStudentCreateForm) quickStudentCreateForm.onsubmit = e => {
+    e.preventDefault();
+    const name = e.target.name.value.trim();
+    if (!name) return;
+    const classId = e.target.classId.value || null;
+    const student = { id: uid('stu'), name, classId, notes: '', observations: [] };
+    state.students.push(student);
+    markDirty();
+    toast('Aluno adicionado. Agora registre a ocorrência.', 'success');
+    openOccurrenceStep2([student.id], null);
+  };
+
   const studentForm = document.getElementById('studentForm');
   if (studentForm) studentForm.onsubmit = e => {
     e.preventDefault();
     const name = e.target.name.value.trim();
     if (!name) return;
-    const classId = e.target.classId.value;
+    const classId = e.target.classId.value || null;
     const editId = studentForm.dataset.editId;
     if (editId) { const s = studentById(editId); s.name = name; s.classId = classId; toast('Aluno salvo com sucesso.', 'success'); }
     else { state.students.push({ id: uid('stu'), name, classId, notes: '', observations: [] }); toast('Aluno adicionado com sucesso.', 'success'); }
@@ -3246,7 +3209,7 @@ function bindModalEvents() {
       a.name = f.name.value.trim(); a.classId = f.classId.value; a.dueDate = f.dueDate.value; a.description = f.description.value.trim();
       toast('Atividade salva com sucesso.', 'success');
     } else {
-      state.activities.push({ id: uid('act'), name: f.name.value.trim(), classId: f.classId.value, dueDate: f.dueDate.value, description: f.description.value.trim(), completions: {} });
+      state.activities.push({ id: uid('act'), name: f.name.value.trim(), classId: f.classId.value || null, dueDate: f.dueDate.value, description: f.description.value.trim() });
       toast('Atividade criada com sucesso.', 'success');
     }
     markDirty(); closeModal(); render();
@@ -3332,14 +3295,12 @@ function bindModalEvents() {
     ctx.reportFrom = from;
     ctx.reportTo = to;
     ctx.reportOpts = {
-      resumo: f.opt_resumo.checked, atividades: f.opt_atividades.checked, entregas: f.opt_entregas.checked,
-      naoEntregas: f.opt_naoEntregas.checked, ocorrencias: f.opt_ocorrencias.checked,
-      observacoes: f.opt_observacoes.checked, linha: f.opt_linha.checked
+      resumo: f.opt_resumo.checked, atividades: f.opt_atividades.checked,
+      ocorrencias: f.opt_ocorrencias.checked, observacoes: f.opt_observacoes.checked,
+      linha: f.opt_linha.checked
     };
     if (changedStudent) ctx.reportSynthesis = '';
-    closeModal(); currentView = 'relatorioIndividual';
-    qAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === 'relatorios'));
-    render();
+    closeModal(); navigate('relatorioIndividual', false);
   };
 
   const classReportConfigForm = document.getElementById('classReportConfigForm');
@@ -3352,9 +3313,7 @@ function bindModalEvents() {
     ctx.classReportId = f.classId.value;
     ctx.classReportFrom = from;
     ctx.classReportTo = to;
-    closeModal(); currentView = 'relatorioTurma';
-    qAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === 'relatorios'));
-    render();
+    closeModal(); navigate('relatorioTurma', false);
   };
 }
 
@@ -3370,7 +3329,7 @@ function openCommandPalette(term) {
     { icon: 'users', label: 'Nova turma', run: () => openClassModal(null) },
     { icon: 'user', label: 'Novo aluno', run: () => openStudentModal(null, null) },
     { icon: 'clipboard', label: 'Nova atividade', run: () => openActivityModal(null) },
-    { icon: 'calendar', label: 'Novo planejamento', run: () => openPlanningModal(null, '') },
+    { icon: 'notebook', label: 'Novo planejamento', run: () => openPlanningModal(null, '') },
     { icon: 'folder', label: 'Abrir arquivo', run: () => openFile() },
     { icon: 'file', label: 'Criar novo arquivo', run: () => beginNewProjectSetup(true) },
     { icon: 'sparkle', label: 'Explorar demonstração', run: () => beginDemoMode() },
@@ -3439,15 +3398,16 @@ function bindViewEvents() {
   qAll('[data-attention-idx]').forEach(el => el.onclick = () => { const it = lastAttentionItems[Number(el.dataset.attentionIdx)]; if (it) it.action(); });
 
   const back = q('#btnBack');
-  if (back) back.onclick = () => {
-    const map = { turmaDetail: 'turmas', alunoDetail: 'alunos', atividadeDetail: 'atividades', relatorioIndividual: 'relatorios', relatorioTurma: 'relatorios' };
-    navigate(map[currentView] || 'dashboard');
-  };
+  if (back) back.onclick = () => goBack('dashboard');
 
   onClick('#btnEmptyNewClass', () => openClassModal(null));
   onClick('#btnEmptyNewStudent', () => openStudentModal(null));
   onClick('#btnQuickRegisterTop', () => openOccurrenceModal());
   onClick('#btnQuickRegisterOcc', () => openOccurrenceModal());
+  onClick('#btnDashboardPlanning', () => openPlanningModal(null));
+  onClick('#btnDashboardCalendar', () => navigate('calendario'));
+  onClick('#btnDashboardOccurrences', () => navigate('ocorrencias'));
+  onClick('#btnDashboardClasses', () => navigate('turmas'));
 
   /* --- turmas --- */
   onClick('#btnNewClass', () => openClassModal(null));
@@ -3471,14 +3431,16 @@ function bindViewEvents() {
   /* --- seleção em massa (alunos da turma) --- */
   onClick('#btnToggleBulk', () => { ctx.bulkMode = !ctx.bulkMode; ctx.bulkSelected = new Set(); render(); });
   qAll('[data-bulk-student]').forEach(el => el.onchange = () => {
-    if (currentView === 'alunos') return;
     if (el.checked) ctx.bulkSelected.add(el.dataset.bulkStudent); else ctx.bulkSelected.delete(el.dataset.bulkStudent);
     render();
   });
   onClick('#btnBulkSelectAll', () => {
-    const ids = currentView === 'atividadeDetail' ? studentsOf(state.activities.find(a => a.id === ctx.activityId).classId).map(s => s.id) : studentsOf(ctx.classId).map(s => s.id);
+    const activity = currentView === 'atividadeDetail' ? state.activities.find(a => a.id === ctx.activityId) : null;
+    const ids = activity ? studentsOf(activity.classId).map(s => s.id) : studentsOf(ctx.classId).map(s => s.id);
     ctx.bulkSelected = new Set(ids); render();
   });
+  onClick('#btnBulkDelete', () => deleteStudentsBulk([...ctx.bulkSelected]));
+  onClick('#btnBulkClear', () => { ctx.bulkSelected = new Set(); render(); });
   onClick('#btnBulkMoveStudents', () => {
     if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
     openMoveStudentModal([...ctx.bulkSelected]);
@@ -3487,13 +3449,7 @@ function bindViewEvents() {
     if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
     openOccurrenceStep2([...ctx.bulkSelected], null);
   });
-  qAll('[data-bulk-set]').forEach(el => el.onclick = () => {
-    const a = state.activities.find(x => x.id === ctx.activityId);
-    if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
-    ctx.bulkSelected.forEach(sid => { a.completions[sid] = el.dataset.bulkSet; });
-    markDirty(); toast(`Entrega atualizada para ${ctx.bulkSelected.size} aluno(s).`, 'success');
-    ctx.bulkMode = false; ctx.bulkSelected = new Set(); render();
-  });
+
 
   /* --- alunos --- */
   onClick('#btnNewStudent', () => openStudentModal(null, null));
@@ -3507,6 +3463,12 @@ function bindViewEvents() {
     ctx.bulkSelected = new Set(ids);
     render();
   });
+  onClick('#btnStudentBulkOccurrence', () => {
+    if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
+    openOccurrenceStep2([...ctx.bulkSelected], null);
+  });
+  onClick('#btnStudentBulkDelete', () => deleteStudentsBulk([...ctx.bulkSelected]));
+  onClick('#btnStudentBulkClear', () => { ctx.bulkSelected = new Set(); render(); });
   onClick('#btnStudentBulkMove', () => {
     if (!ctx.bulkSelected.size) { toast('Selecione ao menos um aluno.', 'error'); return; }
     openMoveStudentModal([...ctx.bulkSelected]);
@@ -3523,8 +3485,6 @@ function bindViewEvents() {
   if (studentSearchInput) studentSearchInput.oninput = () => { ctx.studentSearch = studentSearchInput.value; rerenderKeepFocus(); };
   const studentClassFilterSelect = q('#studentClassFilterSelect');
   if (studentClassFilterSelect) studentClassFilterSelect.onchange = () => { ctx.studentClassFilter = studentClassFilterSelect.value; render(); };
-  const studentSituacaoSelect = q('#studentSituacaoSelect');
-  if (studentSituacaoSelect) studentSituacaoSelect.onchange = () => { ctx.studentSituacao = studentSituacaoSelect.value; render(); };
   const studentSortSelect = q('#studentSortSelect');
   if (studentSortSelect) studentSortSelect.onchange = () => { ctx.studentSort = studentSortSelect.value; render(); };
 
@@ -3567,18 +3527,11 @@ function bindViewEvents() {
   onClick('#btnEditActivity', () => openActivityModal(state.activities.find(a => a.id === ctx.activityId)));
   qAll('[data-del-activity]').forEach(el => el.onclick = e => {
     e.stopPropagation();
-    confirmModal({ title: 'Excluir atividade', body: 'As marcações de entrega desta atividade também serão perdidas.', confirmLabel: 'Excluir', danger: true, onConfirm: () => {
+    confirmModal({ title: 'Excluir atividade', body: 'O registro da atividade será removido da agenda.', confirmLabel: 'Excluir', danger: true, onConfirm: () => {
       state.activities = state.activities.filter(a => a.id !== el.dataset.delActivity);
       markDirty(); toast('Atividade excluída.', 'success');
       if (ctx.activityId === el.dataset.delActivity) navigate('atividades'); else render();
     }});
-  });
-  qAll('[data-cycle-delivery]').forEach(el => el.onclick = () => {
-    const a = state.activities.find(x => x.id === ctx.activityId);
-    const sid = el.dataset.cycleDelivery;
-    const current = getDeliveryState(a, sid);
-    a.completions[sid] = current === 'pending' ? 'delivered' : current === 'delivered' ? 'not_delivered' : 'pending';
-    markDirty(); render();
   });
   qAll('[data-activity-filter]').forEach(el => el.onclick = () => { ctx.activityFilter = el.dataset.activityFilter; render(); });
   const activitySearchInput = q('#activitySearchInput');
@@ -3641,6 +3594,7 @@ function bindViewEvents() {
   onClick('#btnExitDemo', () => exitDemoMode());
   onClick('#btnExitDemoSecondary', () => exitDemoMode());
   onClick('#btnNewFile', () => beginNewProjectSetup(true));
+  onClick('#btnCloseFile', () => closeCurrentFile());
   onClick('#btnOpenFile', () => openFile());
   onClick('#btnSaveFile', () => saveFile());
   onClick('#btnOpenBackups', () => openBackupsModal());
@@ -3723,19 +3677,43 @@ function toggleArchiveClass(classId) {
   markDirty(); toast(cls.archived ? 'Turma arquivada.' : 'Turma reativada.', 'success'); render();
 }
 
+function deleteStudentsBulk(studentIds) {
+  const ids = [...new Set((studentIds || []).filter(Boolean))];
+  const students = ids.map(studentById).filter(Boolean);
+  if (!students.length) { toast('Selecione ao menos um aluno.', 'error'); return; }
+  const idSet = new Set(students.map(s => s.id));
+  const relOcc = (state.occurrences || []).filter(o => idSet.has(o.studentId)).length;
+  const relObs = students.reduce((total, s) => total + (Array.isArray(s.observations) ? s.observations.length : 0), 0);
+  confirmModal({
+    title: `Excluir ${students.length} aluno${students.length === 1 ? '' : 's'}?`,
+    body: 'Os alunos selecionados sairão deste projeto. Ocorrências e observações vinculadas também serão removidas.',
+    detailList: [['Alunos', students.length], ['Ocorrências', relOcc], ['Observações', relObs]],
+    confirmLabel: `Excluir ${students.length === 1 ? 'aluno' : 'alunos'}`, danger: true,
+    onConfirm: () => {
+      state.students = state.students.filter(s => !idSet.has(s.id));
+      state.occurrences = (state.occurrences || []).filter(o => !idSet.has(o.studentId));
+      ctx.bulkMode = false; ctx.bulkSelected = new Set();
+      if (ids.includes(ctx.studentId)) { ctx.studentId = null; navigate('alunos'); return; }
+      markDirty();
+      toast(`${students.length} aluno${students.length === 1 ? '' : 's'} excluído${students.length === 1 ? '' : 's'}.`, 'success');
+      render();
+    },
+  });
+}
+
 function deleteStudent(studentId) {
   const s = studentById(studentId);
   if (!s) return;
   const relOcc = occurrencesOf(studentId).length;
+  const relObs = Array.isArray(s.observations) ? s.observations.length : 0;
   confirmModal({
     title: `Excluir "${s.name}"?`,
     body: 'O aluno e todos os seus registros (ocorrências e observações) serão excluídos permanentemente.',
-    detailList: [['Ocorrências', relOcc]],
+    detailList: [['Ocorrências', relOcc], ['Observações', relObs]],
     confirmLabel: 'Excluir aluno', danger: true,
     onConfirm: () => {
       state.students = state.students.filter(x => x.id !== studentId);
       state.occurrences = state.occurrences.filter(o => o.studentId !== studentId);
-      state.activities.forEach(a => { delete a.completions[studentId]; });
       markDirty(); toast('Aluno excluído.', 'success');
       if (ctx.studentId === studentId) navigate('alunos'); else render();
     },
@@ -3773,7 +3751,6 @@ function parseCSV(text, delimiter = ',') {
   return rows;
 }
 
-function parseCSVLine(line) { return parseCSV(line)[0] || []; }
 
 function handleCsvImportInput(e) {
   const file = e.target.files[0];
@@ -3824,7 +3801,7 @@ function buildSavePayload() {
     teacher: state.teacher,
     classes: state.classes,
     students: state.students,
-    activities: state.activities,
+    activities: (state.activities || []).map(({ completions, ...activity }) => activity),
     occurrences: state.occurrences,
     plans: Array.isArray(state.plans) ? state.plans : [],
   };
@@ -3843,15 +3820,15 @@ function loadDemoData() {
   ];
   const act1 = uid('act'), act2 = uid('act'), act3 = uid('act');
   const activities = [
-    { id: act1, name: 'Lista de exercícios — Frações', classId: c1, dueDate: addDays(3), description: 'Exercícios 1 a 10 do livro.', completions: { [s[0].id]: 'delivered', [s[1].id]: 'not_delivered' } },
-    { id: act2, name: 'Redação — Meio ambiente', classId: c2, dueDate: addDays(-2), description: 'Texto dissertativo, mínimo 20 linhas.', completions: { [s[3].id]: 'delivered', [s[4].id]: 'delivered' } },
-    { id: act3, name: 'Prova — Sistemas do corpo humano', classId: c1, dueDate: addDays(-6), description: '', completions: { [s[0].id]: 'delivered', [s[1].id]: 'not_delivered', [s[2].id]: 'not_delivered' } },
+    { id: act1, name: 'Lista de exercícios — Frações', classId: c1, dueDate: addDays(3), description: 'Exercícios 1 a 10 do livro.' },
+    { id: act2, name: 'Redação — Meio ambiente', classId: c2, dueDate: addDays(-2), description: 'Texto dissertativo, mínimo 20 linhas.' },
+    { id: act3, name: 'Prova — Sistemas do corpo humano', classId: c1, dueDate: addDays(-6), description: '' },
   ];
   const occurrences = [
     { id: uid('occ'), studentId: s[0].id, date: addDays(-4), type: 'participou', description: '' },
     { id: uid('occ'), studentId: s[1].id, date: addDays(-8), type: 'conversou', description: 'Conversou bastante durante a explicação.' },
     { id: uid('occ'), studentId: s[1].id, date: addDays(-1), type: 'nao_atividade', description: '' },
-    { id: uid('occ'), studentId: s[1].id, date: addDays(-15), type: 'nao_entregou', description: '' },
+    { id: uid('occ'), studentId: s[1].id, date: addDays(-15), type: 'observacao', description: 'Registro de acompanhamento anterior.' },
     { id: uid('occ'), studentId: s[3].id, date: addDays(-6), type: 'bom_comportamento', description: '' },
     { id: uid('occ'), studentId: s[4].id, date: addDays(-2), type: 'faltou', description: '' },
   ];

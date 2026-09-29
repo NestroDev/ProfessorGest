@@ -53,7 +53,7 @@ export function createModalController({ icons, escapeHtml, bindEvents, getMobile
     openModal(`
       <div class="confirm-icon danger">${icons.alert}</div>
       <div class="modal-title">Não foi possível abrir este arquivo</div>
-      <p class="confirm-body" style="margin-bottom:18px;">${escapeHtml(message)}</p>
+      <p class="confirm-body confirm-body-spaced">${escapeHtml(message)}</p>
       ${detailItems}
       <div class="form-actions"><button type="button" class="btn-primary" id="modalCancel">Entendi</button></div>
     `);

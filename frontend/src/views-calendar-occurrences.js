@@ -58,7 +58,7 @@ export function createCalendarOccurrenceRenderers(deps) {
         </div>
       </div>
       ${selDay ? `<div class="section-title">Planejamento em ${fmtDate(selDay)}</div>
-        <div class="card list-card">${selPlans.map(plan => `<div class="list-item"><div style="flex:1;"><div class="list-item-title">${esc(plan.title)}</div><div class="list-item-sub">${esc(classNameOf(plan.classId))}</div></div><button type="button" class="btn-secondary btn-sm" data-edit-plan="${esc(plan.id)}">${ICONS.edit} Editar</button></div>`).join('') || emptyState('Nenhum planejamento neste dia.')}</div>
+        <div class="card list-card">${selPlans.map(plan => `<div class="list-item"><div class="list-item-fill"><div class="list-item-title">${esc(plan.title)}</div><div class="list-item-sub">${esc(classNameOf(plan.classId))}</div></div><button type="button" class="btn-secondary btn-sm" data-edit-plan="${esc(plan.id)}">${ICONS.edit} Editar</button></div>`).join('') || emptyState('Nenhum planejamento neste dia.')}</div>
         <div class="section-title">Atividades em ${fmtDate(selDay)}</div>
         <div class="card list-card">${selActs.map(a => `<div class="list-item"><div class="list-item-main" data-open-activity="${esc(a.id)}" role="button" tabindex="0">
           <div class="list-item-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))}</div></div></div>`).join('') || emptyState('Nenhuma atividade neste dia.')}</div>` : ''}
@@ -80,7 +80,7 @@ export function createCalendarOccurrenceRenderers(deps) {
         <select class="form-select" id="occClassFilterSelect"><option value="">Todas as turmas</option>
           ${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().occClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
         <select class="form-select" id="occTypeFilterSelect"><option value="">Todos os tipos</option>
-          ${occurrenceTypes.map(t => `<option value="${esc(t.key)}" ${getCtx().occTypeFilter === t.key ? 'selected' : ''}>${t.emoji} ${esc(t.label)}</option>`).join('')}</select>
+          ${occurrenceTypes.map(t => `<option value="${esc(t.key)}" ${getCtx().occTypeFilter === t.key ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
       </div>
       <div class="card list-card">${list.map(o => { const s = studentById(o.studentId); return `<div class="list-item">
         <div class="list-item-main" data-open-student="${esc(o.studentId)}">

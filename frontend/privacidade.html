@@ -3,18 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#2563EB">
+<meta name="theme-color" content="#F5F7FB">
 <title>Política de Privacidade — ProfessorGest</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg?v=21">
-<style>
-:root{--primary:#2563EB;--primary-dark:#1D4ED8;--bg:#F4F7FC;--card:#fff;--text:#182233;--muted:#5F6B7A;--border:#E5E8EE;--soft:#EFF6FF;}
-*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased}.wrap{width:min(920px,calc(100% - 32px));margin:0 auto;padding:34px 0 56px}.top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}.brand img{width:42px;height:42px}.brand strong{display:block;font-size:18px}.brand span{display:block;font-size:12px;color:var(--muted)}.back{color:var(--primary);font-weight:700;text-decoration:none}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:32px;box-shadow:0 10px 30px rgba(12,32,54,.07)}h1{margin:0 0 8px;font-size:32px;line-height:1.2;color:var(--primary-dark)}.updated{margin:0 0 28px;color:var(--muted);font-size:13px}h2{margin:28px 0 10px;font-size:20px;color:var(--primary-dark)}p{margin:0 0 14px}ul{margin:8px 0 16px 22px;padding:0}li{margin:6px 0}.notice{background:var(--soft);border:1px solid #BFDBFE;border-radius:12px;padding:14px 16px;margin:18px 0}.footer{margin-top:18px;color:var(--muted);font-size:12px;text-align:center}.links{display:flex;gap:14px;flex-wrap:wrap;margin-top:28px;padding-top:20px;border-top:1px solid var(--border)}.links a{color:var(--primary);font-weight:700;text-decoration:none}@media(max-width:640px){.wrap{width:min(100% - 20px,920px);padding-top:18px}.card{padding:22px 18px}h1{font-size:27px}.top{align-items:flex-start;flex-direction:column}}
-</style>
+<script>
+(() => { try { const saved = localStorage.getItem('professorgest-theme'); const mode = ['light','dark','system'].includes(saved) ? saved : 'light'; const dark = mode === 'dark' || (mode === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; } catch (_) { document.documentElement.dataset.theme = 'light'; } })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="legal.css">
 </head>
 <body>
 <div class="wrap">
   <div class="top">
-    <a class="brand" href="./"><img src="logo.svg?v=21" alt="ProfessorGest"><span><strong>ProfessorGest</strong><span>gestão pedagógica</span></span></a>
+    <a class="brand" href="./"><img src="logo.svg?v=21" alt="ProfessorGest"><span class="brand-copy"><strong>ProfessorGest</strong><span>gestão pedagógica</span></span></a>
     <a class="back" href="./">Voltar ao aplicativo</a>
   </div>
   <main class="card">
@@ -30,7 +32,7 @@
     <ul>
       <li>nome do professor, escola ou instituição e disciplina/área;</li>
       <li>nomes de turmas e alunos;</li>
-      <li>atividades, datas, descrições e registros de entrega;</li>
+      <li>atividades, datas, descrições e atividades e registros pedagógicos;</li>
       <li>ocorrências, observações pedagógicas e anotações associadas aos alunos;</li>
       <li>dados técnicos necessários para salvar e reabrir o projeto no mesmo dispositivo, como nome do arquivo e preferências do aplicativo.</li>
     </ul>

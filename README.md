@@ -1,88 +1,134 @@
 # ProfessorGest
 
-Aplicativo web para organização e acompanhamento pedagógico.
+Aplicativo PWA local-first para organização e acompanhamento pedagógico.
 
-## Publicação no GitHub Pages
+## Arquitetura
 
-O site é publicado pelo GitHub Actions. O repositório pode permanecer público sem armazenar a chave da API do Google Drive.
+O projeto é dividido em duas partes:
 
-### 1. Criar o Secret da API Key
-
-No GitHub, abra:
-
-`Settings → Secrets and variables → Actions → New repository secret`
-
-Crie:
-
-`PROFESSORGEST_GOOGLE_API_KEY`
-
-O valor deve ser uma API Key do Google Cloud **restrita ao site e às APIs necessárias**.
-
-### 2. Configurar o GitHub Pages
-
-Em:
-
-`Settings → Pages → Build and deployment → Source`
-
-selecione **GitHub Actions**.
-
-O workflow `.github/workflows/deploy-pages.yml` injeta a API Key somente no artefato que será publicado. A chave não é gravada de volta no repositório.
-
-### 3. Configurar o Google Cloud
-
-Para o Google Picker, restrinja a API Key por website e inclua o domínio do ProfessorGest e `https://docs.google.com/*`. Restrinja também a chave às APIs usadas pelo aplicativo, incluindo Google Picker API e Google Drive API. Consulte a documentação oficial do Google antes de publicar alterações de credenciais.
-
-### Desenvolvimento local
-
-A configuração pública fica em `google-drive-config.js` e não precisa ser alterada para testar o Drive. Para usar o Google Drive localmente, copie `config/google-drive-config.local.example.js` para `google-drive-config.local.js` na raiz e coloque apenas a API key local no arquivo. Esse arquivo já está no `.gitignore`, então ele não será enviado ao GitHub.
-
-Assim, o fluxo fica estável: a chave local permanece no seu ambiente de desenvolvimento, enquanto o GitHub Actions continua injetando a chave de produção no artefato publicado. Você não precisa ficar colocando e retirando a chave antes de cada push.
-
-Para o OAuth, adicione no Google Cloud as origens JavaScript autorizadas que você realmente usa no desenvolvimento, por exemplo `http://localhost:5500` e `http://127.0.0.1:5500`. Para a API key do Picker, a documentação do Google também exige a origem local e `https://docs.google.com/*` nas restrições de site.
-
-O arquivo `google-drive-config.local.js` pode ficar assim:
-
-```js
-window.PROFESSORGEST_GOOGLE_CONFIG = {
-  ...(window.PROFESSORGEST_GOOGLE_CONFIG || {}),
-  apiKey: 'SUA_API_KEY_LOCAL_RESTRITA',
-};
+```text
+frontend/   → PWA, interface, IndexedDB, arquivos .prof, Service Worker e cliente de API
+backend/    → API HTTP stateless para serviços que realmente dependem de servidor
 ```
 
-## Dados de usuário
+O projeto continua **local-first**. O arquivo `.prof` pertence ao usuário e continua sendo a fonte principal dos dados. O IndexedDB é usado para apoio local, recuperação e cache limitado. O Google Drive é opcional.
 
-Arquivos `.prof`, `.prof.json` e logs não devem ser enviados ao repositório.
+O frontend não precisa do backend para abrir, editar, salvar ou exportar um `.prof`.
 
-## Arquitetura e segurança
+## API
 
-A partir do formato v3, cada projeto possui `projectId` estável. O nome do arquivo não é usado como identidade do projeto. Vínculos com o Google Drive são indexados por `projectId`.
+A API utiliza endpoints versionados:
 
-Arquivos `.prof` são tratados como entrada não confiável: IDs, referências, datas, tipos e limites são validados antes do projeto ser aceito. O recovery principal é mantido em IndexedDB e o armazenamento local preserva projetos por identificador. Além da recuperação imediata, o aplicativo mantém cópias de segurança automáticas e recentes do projeto neste dispositivo, permitindo revisão e restauração quando necessário.
+```text
+GET /api/v1/health
+GET /api/v1/version
+```
 
-O exportador de PDF é carregado somente quando solicitado. O Service Worker não ativa automaticamente uma nova versão enquanto o aplicativo pode estar com alterações locais pendentes.
+Respostas de erro seguem um formato consistente:
 
-Para validação local:
+```json
+{
+  "error": {
+    "code": "SOME_ERROR",
+    "message": "Descrição legível"
+  }
+}
+```
+
+Para iniciar a API localmente:
+
+```bash
+npm run start:api
+```
+
+Por padrão ela escuta em `http://127.0.0.1:8787`.
+
+Quando necessário, o frontend pode usar a API através de `window.PROFESSORGEST_API_BASE_URL`. O acesso é centralizado em `frontend/src/services/api-client.js`; chamadas de domínio não devem espalhar `fetch()` diretamente pelas views.
+
+A API atual é deliberadamente pequena e stateless. Ela é **opcional**: o ProfessorGest funciona no GitHub Pages sem qualquer backend hospedado. Não existe sincronização obrigatória nem armazenamento automático de todos os arquivos `.prof` em um servidor.
+
+Para usar um backend opcional em uma implantação, configure a variável pública de repositório `PROFESSORGEST_API_BASE_URL` com uma URL HTTPS. Sem essa variável, o cliente de API permanece desativado.
+
+## Google Drive
+
+O identificador OAuth e o App ID são públicos. A API Key não deve ficar no repositório.
+
+Para habilitar o Google Drive no GitHub Pages, crie o secret opcional:
+
+```text
+PROFESSORGEST_GOOGLE_API_KEY
+```
+
+Se o secret não existir, o deploy continua normalmente e o restante do aplicativo permanece funcional; apenas a integração com Drive fica desativada. O workflow injeta a chave somente no artefato de publicação, nunca no repositório.
+
+Para desenvolvimento local, copie:
+
+```text
+config/google-drive-config.local.example.js
+```
+
+para um arquivo local de configuração e mantenha a chave fora do controle de versão. O arquivo local é ignorado pelo `.gitignore`.
+
+## Navegação e sessão
+
+A navegação do aplicativo usa History API e `popstate`. A rota atual e seu contexto serializável ficam em `sessionStorage`, permitindo continuar na mesma área depois de recarregar a página.
+
+O botão Voltar do Android segue o histórico real do aplicativo. Modais e overlays têm tratamento próprio antes de abandonar a rota.
+
+## Modelo de acompanhamento
+
+O ProfessorGest acompanha **alunos conforme a necessidade do professor**. Uma turma não exige que a lista completa de alunos esteja cadastrada.
+
+Um aluno pode ser criado diretamente durante o registro de uma ocorrência. Depois disso, o histórico do aluno é composto principalmente por:
+
+- ocorrências;
+- observações;
+- registros de acompanhamento.
+
+Atividades são tratadas como itens de agenda pedagógica, com nome, turma, data e descrição. O antigo fluxo de controle de entrega individual não faz mais parte do fluxo principal.
+
+Arquivos `.prof` v3 que ainda contenham marcações antigas de entrega continuam podendo ser importados; esses campos são ignorados com aviso, em vez de causar uma falha silenciosa.
+
+## PWA e mobile
+
+No Android, a navegação principal usa uma barra inferior e uma entrada dedicada para recursos de aula, mantendo Planejamento e Calendário acessíveis. A interface usa `viewport-fit=cover` e safe areas quando necessário.
+
+Os documentos públicos de Termos e Privacidade usam o mesmo sistema visual e respeitam o tema salvo pelo aplicativo.
+
+## GitHub Pages
+
+O diretório `dist/` é gerado durante o build e **não deve ser versionado**.
+
+Gerar o artefato:
+
+```bash
+npm run build:pages
+```
+
+O GitHub Actions publica somente o artefato gerado para Pages.
+
+No repositório devem permanecer o código-fonte, testes, scripts, documentação e arquivos de configuração seguros. Dados de usuário, arquivos `.prof`, logs, ZIPs e configurações locais não devem ser enviados.
+
+## QA
+
+O gate local completo é:
 
 ```bash
 npm run qa
 ```
 
-## Arquitetura atual
+Ele executa:
 
-O código de domínio do formato `.prof`, a persistência IndexedDB, os vínculos do Google Drive, o transporte HTTP do Drive, o I/O de arquivos, os seletores/estatísticas, a navegação e as primitivas de modal ficam em módulos separados em `src/`. `app.js` permanece como camada de orquestração da interface e das views, enquanto essas camadas podem ser testadas independentemente.
+1. checagem sintática dos módulos do frontend e backend;
+2. geração do artefato do GitHub Pages;
+3. suíte automatizada.
 
-O formato v3 usa `projectId` como identidade estável. O nome do arquivo continua sendo apenas uma apresentação/localização. Os vínculos do Drive são armazenados por `projectId`, permitindo que projetos com o mesmo nome coexistam sem compartilhar acidentalmente a sincronização.
+A suíte cobre modelo `.prof`, persistência local, Drive, I/O de arquivos, navegação, modais, views, PWA, acessibilidade estrutural, salvamento e integridade do release.
 
-O cache offline do Service Worker inclui todos os módulos JavaScript necessários para a execução da aplicação em modo offline. O transporte do Drive e o I/O de arquivos continuam sem efeitos colaterais em módulo, recebendo dependências do ambiente quando necessário.
+O teste de artefato também pode ser executado diretamente com:
 
-## Arquitetura atual (build 2026.09.27.21)
+```bash
+npm test
+```
 
-A base do aplicativo permanece local-first. As responsabilidades críticas já estão separadas em módulos: `prof-model.js`, `local-store.js`, `drive-bindings.js`, `drive-http.js`, `file-io.js`, `project-selectors.js`, `ui-navigation.js`, `ui-modal.js`, `save-state.js` e `views-core.js`, `views-students-activities.js`, `views-calendar-occurrences.js`, `views-reports.js`, `views-class.js`, `views-file-settings.js` e `views-welcome.js`. O `app.js` permanece como orquestrador de eventos, estado e ações, enquanto as views podem ser testadas independentemente.
-
-O pipeline local de QA executa checagem sintática e testes automatizados com `npm run qa`. O Service Worker inclui todos os módulos do shell offline.
-
-A suíte atual possui testes automatizados para modelo, persistência, Drive, I/O, acessibilidade estrutural, máquina de salvamento, navegação, modais e renderização das views. A contagem é validada automaticamente pelo pipeline `npm run qa`. A validação de navegador completo e de dispositivos físicos Android/Google Drive continua sendo uma etapa de validação externa, porque depende de execução em um ambiente de navegador real com permissões e APIs de plataforma.
-
-## Artefato de publicação
-
-O repositório contém código-fonte, testes, documentação e configuração de desenvolvimento. O GitHub Pages publica somente o diretório `dist/`, gerado por `npm run build:pages`. Esse diretório contém apenas os arquivos necessários ao funcionamento do aplicativo e à verificação do domínio.
+A validação final em navegador real, especialmente permissões do Google Drive e comportamento do Web App instalado no Android, continua sendo uma etapa manual.

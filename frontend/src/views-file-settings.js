@@ -10,8 +10,8 @@ export function createFileSettingsRenderers(deps) {
       return `
         <div class="page-head"><div><h1>Demonstração</h1><div class="page-sub">Explore o ProfessorGest com dados de exemplo.</div></div><div class="page-actions"><button type="button" class="btn-primary" id="btnExitDemo">Criar meu arquivo</button></div></div>
         <div class="card demo-file-card">
-          <div class="section-title" style="margin-top:0;">Ambiente de demonstração</div>
-          <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;">Navegue pelas telas, abra alunos, veja atividades e experimente os relatórios. Este ambiente não substitui seu arquivo.</p>
+          <div class="section-title section-title-first">Ambiente de demonstração</div>
+          <p class="settings-lead">Navegue pelas telas, abra alunos, veja atividades e experimente os relatórios. Este ambiente não substitui seu arquivo.</p>
           <div class="demo-feature-grid">
             <div><strong>2 turmas</strong><span>com alunos e atividades</span></div>
             <div><strong>5 alunos</strong><span>com histórico e registros</span></div>
@@ -23,7 +23,7 @@ export function createFileSettingsRenderers(deps) {
     }
     const backups = getProjectBackups();
     return `
-      <div class="page-head"><div><h1>Arquivos</h1><div class="page-sub">Abra, salve e proteja seu trabalho.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnNewFile">${ICONS.file} Novo arquivo</button></div></div>
+      <div class="page-head"><div><h1>Arquivos</h1><div class="page-sub">Abra, salve e proteja seu trabalho.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnNewFile">${ICONS.file} Novo arquivo</button><button type="button" class="btn-ghost" id="btnCloseFile">${ICONS.x} Fechar arquivo</button></div></div>
 
       <section class="file-workspace card">
         <div class="file-workspace-head">
@@ -69,7 +69,7 @@ export function createFileSettingsRenderers(deps) {
       </details>
 
       <p class="file-meta-line">Criado em ${fmtDate(getState().createdAt)} · Última alteração: ${fmtDateTime(getState().updatedAt)}</p>
-      <input type="file" id="csvInput" accept=".csv" style="display:none">
+      <input type="file" id="csvInput" class="visually-hidden" accept=".csv">
     `;
   }
 
@@ -82,8 +82,8 @@ export function createFileSettingsRenderers(deps) {
 
       <div class="grid grid-2">
         <section class="card">
-          <div class="section-title" style="margin-top:0;">Perfil do professor</div>
-          <p class="form-hint" style="margin-bottom:14px;">Estas informações ajudam a personalizar o dashboard e os relatórios.</p>
+          <div class="section-title section-title-first">Perfil do professor</div>
+          <p class="form-hint settings-hint-md">Estas informações ajudam a personalizar o dashboard e os relatórios.</p>
           <div class="form-row">
             <div class="form-group"><label class="form-label">Nome do professor(a)</label>
               <input class="form-input" id="teacherNameInput" value="${esc((getState().teacher && getState().teacher.name) || '')}" placeholder="Ex.: Prof. João"></div>
@@ -96,27 +96,27 @@ export function createFileSettingsRenderers(deps) {
         </section>
 
         <section class="card">
-          <div class="section-title" style="margin-top:0;">Arquivos e sincronização</div>
-          <p class="form-hint" style="margin-bottom:12px;">Abra, salve, faça cópias de segurança e gerencie o Google Drive em um único lugar.</p>
+          <div class="section-title section-title-first">Arquivos e sincronização</div>
+          <p class="form-hint settings-hint">Abra, salve, faça cópias de segurança e gerencie o Google Drive em um único lugar.</p>
           <div class="drive-settings-status ${driveStatusTone()}">
             <span class="drive-settings-icon">${ICONS.cloud}</span>
             <div><strong>${esc(driveStatusText())}</strong><span>${driveBindingForCurrentProject() ? `Projeto: ${esc(driveBindingForCurrentProject().name || getCurrentFileName() || 'Projeto atual')}` : 'Google Drive opcional.'}</span></div>
           </div>
-          <div class="form-actions" style="margin-top:14px;">
+          <div class="form-actions form-actions-settings">
             <button type="button" class="btn-primary" id="btnGoFileFromSettings">${ICONS.folder} Abrir Arquivos</button>
           </div>
         </section>
 
         <section class="card">
-          <div class="section-title" style="margin-top:0;">Dados neste dispositivo</div>
-          <p class="form-hint" style="margin-bottom:12px;">Gerencie recuperação, cópias de segurança e os dados que o ProfessorGest mantém neste navegador.</p>
+          <div class="section-title section-title-first">Dados neste dispositivo</div>
+          <p class="form-hint settings-hint">Gerencie recuperação, cópias de segurança e os dados que o ProfessorGest mantém neste navegador.</p>
           <button type="button" class="btn-secondary" id="btnOpenLocalDataSettings">${ICONS.settings || ICONS.folder} Gerenciar dados deste dispositivo</button>
         </section>
 
         <section class="card">
-          <div class="section-title" style="margin-top:0;">Ajuda e suporte</div>
-          <p class="form-hint" style="margin-bottom:12px;">Se algo não funcionar como esperado, o ProfessorGest guarda algumas informações do problema neste dispositivo para ajudar a identificar o que aconteceu. Elas não são enviadas automaticamente.</p>
-          <p id="devLogSummary" class="form-hint" style="margin-bottom:12px;">${getDevLogEntries().length ? `${getDevLogEntries().length} problema(s) registrado(s).` : 'Nenhum problema registrado.'}</p>
+          <div class="section-title section-title-first">Ajuda e suporte</div>
+          <p class="form-hint settings-hint">Se algo não funcionar como esperado, o ProfessorGest guarda algumas informações do problema neste dispositivo para ajudar a identificar o que aconteceu. Elas não são enviadas automaticamente.</p>
+          <p id="devLogSummary" class="form-hint settings-hint">${getDevLogEntries().length ? `${getDevLogEntries().length} problema(s) registrado(s).` : 'Nenhum problema registrado.'}</p>
           <div class="form-actions">
             <button type="button" class="btn-secondary" id="btnExportDevLog">${ICONS.file} Baixar informações para suporte</button>
             <button type="button" class="btn-ghost" id="btnClearDevLog">Apagar registros</button>
@@ -124,8 +124,8 @@ export function createFileSettingsRenderers(deps) {
         </section>
 
         <section class="card">
-          <div class="section-title" style="margin-top:0;">Aparência</div>
-          <p class="form-hint" style="margin-bottom:4px;">Escolha como o ProfessorGest deve aparecer neste dispositivo.</p>
+          <div class="section-title section-title-first">Aparência</div>
+          <p class="form-hint settings-hint-xs">Escolha como o ProfessorGest deve aparecer neste dispositivo.</p>
           <div class="theme-setting-grid">
             <button type="button" class="theme-option ${mode === 'light' ? 'active' : ''}" data-theme-mode="light"><div class="theme-preview light"></div><strong>Claro</strong><span>Visual leve e luminoso.</span></button>
             <button type="button" class="theme-option ${mode === 'dark' ? 'active' : ''}" data-theme-mode="dark"><div class="theme-preview dark"></div><strong>Escuro</strong><span>Confortável para ambientes com pouca luz.</span></button>

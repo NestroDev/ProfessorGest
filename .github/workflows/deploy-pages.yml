@@ -30,13 +30,30 @@ jobs:
       - name: Validate application
         run: npm run qa
 
-      - name: Inject Google Drive API key
+      - name: Configure optional public API
+        env:
+          PROFESSORGEST_API_BASE_URL: ${{ vars.PROFESSORGEST_API_BASE_URL }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+
+          base = os.environ.get('PROFESSORGEST_API_BASE_URL', '').strip().rstrip('/')
+          Path('frontend/api-config.js').write_text(
+              f"globalThis.PROFESSORGEST_API_BASE_URL = {json.dumps(base)};\n",
+              encoding='utf-8'
+          )
+          print('Optional backend:', 'configured' if base else 'disabled (GitHub Pages standalone)')
+          PY
+
+      - name: Inject optional Google Drive API key
         env:
           GOOGLE_API_KEY: ${{ secrets.PROFESSORGEST_GOOGLE_API_KEY }}
         run: |
           if [ -z "$GOOGLE_API_KEY" ]; then
-            echo "Missing required secret: PROFESSORGEST_GOOGLE_API_KEY" >&2
-            exit 1
+            echo "Google Drive API key not configured; Drive remains optional/off."
+            exit 0
           fi
 
           python3 - <<'PY'
@@ -44,7 +61,7 @@ jobs:
           import os
           import json
 
-          path = Path('google-drive-config.js')
+          path = Path('frontend/google-drive-config.js')
           text = path.read_text(encoding='utf-8')
           key = os.environ['GOOGLE_API_KEY']
           encoded = json.dumps(key, ensure_ascii=False)

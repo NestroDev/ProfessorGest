@@ -1,13 +1,14 @@
 {
   "name": "professorgest",
   "private": true,
-  "version": "2026.09.28.03",
+  "version": "2026.09.28.2",
   "description": "ProfessorGest - aplicativo PWA local-first para organização pedagógica",
   "scripts": {
     "test": "node --test",
     "build:pages": "node scripts/build-pages.mjs",
-    "check": "node --check app.js && node --check src/prof-model.js && node --check src/local-store.js && node --check src/drive-bindings.js && node --check src/file-io.js && node --check src/drive-http.js && node --check src/project-selectors.js && node --check src/ui-navigation.js && node --check src/ui-modal.js && node --check src/save-state.js && node --check src/views-core.js && node --check src/views-students-activities.js && node --check src/views-calendar-occurrences.js && node --check src/views-reports.js && node --check src/views-class.js && node --check src/views-file-settings.js && node --check src/views-welcome.js && node --check src/views-planning.js",
-    "qa": "npm run check && npm run build:pages && npm test"
+    "check": "node --check frontend/app.js && node --check frontend/src/prof-model.js && node --check frontend/src/local-store.js && node --check frontend/src/drive-bindings.js && node --check frontend/src/file-io.js && node --check frontend/src/drive-http.js && node --check frontend/src/project-selectors.js && node --check frontend/src/ui-navigation.js && node --check frontend/src/ui-modal.js && node --check frontend/src/save-state.js && node --check frontend/src/views-core.js && node --check frontend/src/views-students-activities.js && node --check frontend/src/views-calendar-occurrences.js && node --check frontend/src/views-reports.js && node --check frontend/src/views-class.js && node --check frontend/src/views-file-settings.js && node --check frontend/src/views-welcome.js && node --check frontend/src/views-planning.js && node --check frontend/src/services/api-client.js && node --check backend/server.mjs",
+    "qa": "npm run check && npm run build:pages && npm test",
+    "start:api": "node backend/server.mjs"
   },
   "engines": {
     "node": ">=20"

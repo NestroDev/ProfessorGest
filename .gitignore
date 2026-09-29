@@ -6,7 +6,7 @@
 !.env.example
 
 # Local Google Drive configuration overrides
-# Keep the public stub in google-drive-config.js; never replace it in a commit
+# Keep the public stub in frontend/google-drive-config.js; never replace it in a commit
 # with real credentials.
 
 # =========================
@@ -44,3 +44,6 @@ _site/
 
 # Local development copy with a real Google API key
 google-drive-config.local.js
+
+# Local frontend secrets/config
+frontend/google-drive-config.local.js

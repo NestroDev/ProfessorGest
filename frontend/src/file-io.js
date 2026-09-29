@@ -54,14 +54,14 @@ export function profSavePickerTypes() {
 }
 
 export function supportsFileShare(navigatorLike = globalThis.navigator, FileCtor = globalThis.File) {
-  return !!(navigatorLike?.share && navigatorLike?.canShare && typeof FileCtor !== 'undefined');
+  return !!(navigatorLike?.share && typeof FileCtor !== 'undefined');
 }
 
 export async function shareFile(content, filename, mime = PROF_MIME, navigatorLike = globalThis.navigator, FileCtor = globalThis.File) {
   if (!supportsFileShare(navigatorLike, FileCtor)) return false;
   try {
     const file = new FileCtor([content], normalizeProfFileName(filename), { type: mime });
-    if (!navigatorLike.canShare({ files: [file] })) return false;
+    if (navigatorLike.canShare && !navigatorLike.canShare({ files: [file] })) return false;
     await navigatorLike.share({ files: [file], title: file.name });
     return true;
   } catch (err) {

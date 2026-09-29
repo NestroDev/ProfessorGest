@@ -1,9 +1,11 @@
-const CACHE_NAME = 'professorgest-shell-v45';
+const CACHE_NAME = 'professorgest-shell-v47';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css',
+  './legal.css',
   './app.js',
+  './api-config.js',
   './src/prof-model.js',
   './src/local-store.js',
   './src/drive-bindings.js',
@@ -21,6 +23,7 @@ const APP_SHELL = [
   './src/views-file-settings.js',
   './src/views-welcome.js',
   './src/views-planning.js',
+  './src/services/api-client.js',
   './google-drive-config.js',
   './logo.svg?v=21',
   './manifest.webmanifest?v=21',

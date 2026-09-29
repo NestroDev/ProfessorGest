@@ -35,8 +35,6 @@
 </head>
 <body class="app-booting">
 
-<!-- O splash permanece até os dados iniciais e os elementos visuais estarem prontos.
-     O app.js também aplica uma duração mínima de 1,2 s para evitar flashes. -->
 <div class="app-boot-screen" id="appBootScreen" role="status" aria-live="polite" aria-label="Carregando ProfessorGest">
   <div class="app-boot-glow app-boot-glow-one"></div>
   <div class="app-boot-glow app-boot-glow-two"></div>
@@ -67,8 +65,8 @@
       </div>
     </div>
     <button class="welcome-theme-toggle" id="welcomeThemeToggle" type="button" aria-label="Alternar tema">
-      <span class="theme-icon theme-icon-sun">☀</span>
-      <span class="theme-icon theme-icon-moon">☾</span>
+      <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span>
+      <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2z"/></svg></span>
     </button>
   </header>
 
@@ -86,15 +84,15 @@
           <strong>Abrir arquivo</strong>
           <span>Escolher um arquivo .prof</span>
         </span>
-        <span class="welcome-card-arrow">→</span>
+        <span class="welcome-card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </button>
       <button class="welcome-card primary" id="welcomeNewFile" type="button">
-        <span class="welcome-card-icon" aria-hidden="true">+</span>
+        <span class="welcome-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></span>
         <span class="welcome-card-copy">
           <strong>Criar novo arquivo</strong>
           <span>Começar um novo espaço</span>
         </span>
-        <span class="welcome-card-arrow">→</span>
+        <span class="welcome-card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </button>
     </div>
 
@@ -104,19 +102,19 @@
       <div class="welcome-secondary-label">Outras opções</div>
       <div class="welcome-secondary-row">
         <button class="welcome-secondary-action" id="welcomeDemo" type="button">
-          <span class="welcome-secondary-icon" aria-hidden="true">✦</span>
+          <span class="welcome-secondary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg></span>
           <span>Ver demonstração</span>
         </button>
         <button class="welcome-secondary-action" id="welcomeDrive" type="button">
-          <span class="welcome-secondary-icon" aria-hidden="true">☁</span>
+          <span class="welcome-secondary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18h10.2a4.8 4.8 0 0 0 .6-9.56A6.5 6.5 0 0 0 5.1 9.7 4.2 4.2 0 0 0 7 18z"/></svg></span>
           <span>Google Drive</span>
         </button>
         <button class="welcome-secondary-action" id="welcomeBackups" type="button">
-          <span class="welcome-secondary-icon" aria-hidden="true">↺</span>
+          <span class="welcome-secondary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 0 0-14.9-3.8L3 10M3 5v5h5"/><path d="M4 13a8 8 0 0 0 14.9 3.8L21 14M21 19v-5h-5"/></svg></span>
           <span>Cópias de segurança</span>
         </button>
         <button class="welcome-secondary-action" id="welcomeSettings" type="button">
-          <span class="welcome-secondary-icon" aria-hidden="true">⚙</span>
+          <span class="welcome-secondary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.1 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
           <span>Configurações</span>
         </button>
         <button class="welcome-secondary-action is-hidden" id="welcomeInstall" type="button">
@@ -150,8 +148,8 @@
       </div>
     </div>
     <button class="welcome-theme-toggle" id="setupThemeToggle" type="button" aria-label="Alternar tema">
-      <span class="theme-icon theme-icon-sun">☀</span>
-      <span class="theme-icon theme-icon-moon">☾</span>
+      <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span>
+      <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2z"/></svg></span>
     </button>
   </header>
 
@@ -178,7 +176,7 @@
         </div>
         <div class="setup-actions">
           <button type="button" class="btn-secondary" id="setupBackBtn">Voltar</button>
-          <button type="submit" class="btn-primary">Começar no ProfessorGest <span aria-hidden="true">→</span></button>
+          <button type="submit" class="btn-primary">Começar no ProfessorGest <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
         </div>
       </form>
     </section>
@@ -227,8 +225,8 @@
       <div class="topbar-right">
         <div class="topbar-save-action" id="topbarSaveAction"></div>
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar tema" title="Alternar tema">
-          <span class="theme-icon theme-icon-sun">☀</span>
-          <span class="theme-icon theme-icon-moon">☾</span>
+          <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span>
+          <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2z"/></svg></span>
         </button>
         <div class="topbar-file" id="topbarFile"></div>
         <div class="topbar-avatar" id="topbarAvatar">P</div>
@@ -237,7 +235,8 @@
     <main id="viewContainer" class="view-container"></main>
   </div>
 
-  <!-- Bottom nav (mobile) -->
+  <!-- Contextual navigation and bottom dock (mobile) -->
+  <div class="mobile-context-nav" id="mobileContextNav" aria-live="polite"></div>
   <nav class="bottom-nav" id="bottomNav"></nav>
 
   <!-- Floating quick register button (mobile) -->
@@ -250,45 +249,15 @@
 <div id="cmdkRoot"></div>
 <div class="toast-root" id="toastRoot"></div>
 
-<input type="file" id="fileInput" accept=".prof,.prof.json,.json,application/vnd.professorgest,application/json,text/plain,application/octet-stream" style="display:none">
+<input type="file" id="fileInput" class="visually-hidden" accept=".prof,.prof.json,.json,application/vnd.professorgest,application/json,text/plain,application/octet-stream">
 
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://apis.google.com/js/api.js" async></script>
+<script src="api-config.js"></script>
 <script src="google-drive-config.js"></script>
 <!-- Em desenvolvimento local, este arquivo opcional sobrescreve apenas as credenciais locais.
      No artefato publicado ele é sempre substituído por um stub sem segredos. -->
 <script src="google-drive-config.local.js"></script>
 <script type="module" src="app.js"></script>
-
-    <button class="project-about-button" id="projectAboutButton" type="button"
-      aria-controls="projectInfoModal" aria-expanded="false">
-      Sobre o projeto
-    </button>
-
-    <div class="project-info-modal" id="projectInfoModal" aria-hidden="true">
-      <div class="project-info-backdrop" data-project-info-close></div>
-      <section class="project-info-card" role="dialog" aria-modal="true"
-        aria-labelledby="projectInfoTitle">
-        <button class="project-info-close" type="button" data-project-info-close
-          aria-label="Fechar">×</button>
-        <div class="project-info-kicker">PROJETO</div>
-        <h2 id="projectInfoTitle">ProfessorGest</h2>
-        <p class="project-info-description">
-          Plataforma de gestão pedagógica para professores.
-        </p>
-
-        <div class="project-team">
-          <div class="project-team-heading">Envolvidos no projeto</div>
-          <div class="project-team-member">
-            <div class="project-team-avatar" aria-hidden="true">M</div>
-            <div>
-              <strong>Murilo Fernandes Garcia</strong>
-              <span>Desenvolvimento do projeto</span>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
 </body>
 </html>

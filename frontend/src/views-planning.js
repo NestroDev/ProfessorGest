@@ -48,7 +48,7 @@ export function createPlanningViewRenderer(deps) {
         <div class="page-actions"><button type="button" class="btn-primary" id="btnNewPlan">${ICONS.plus} Novo planejamento</button></div>
       </div>
       <div class="filter-bar planning-filters filter-bar-clean">
-        <div class="search-bar" style="max-width:340px;"><input class="form-input input-search" id="planningSearchInput" placeholder="Buscar planejamento..." value="${esc(ctx.planningSearch || '')}"></div>
+        <div class="search-bar planning-search-bar"><input class="form-input input-search" id="planningSearchInput" placeholder="Buscar planejamento..." value="${esc(ctx.planningSearch || '')}"></div>
         <select class="form-select" id="planningClassFilterSelect">
           <option value="">Todas as turmas</option>
           ${state.classes.filter(c => !c.archived).map(c => `<option value="${esc(c.id)}" ${ctx.planningClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
