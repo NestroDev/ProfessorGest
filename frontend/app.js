@@ -1710,8 +1710,8 @@ async function showWelcomeScreen({ withLoading = true } = {}) {
     document.getElementById('welcomeScreen')?.classList.remove('is-hidden');
     document.getElementById('setupScreen')?.classList.add('is-hidden');
     updateThemeToggle();
-    renderWelcomeRecovery();
-    hydrateRecoveryCache().then(() => renderWelcomeRecovery()).catch(() => {});
+    await hydrateRecoveryCache();
+    await renderWelcomeRecovery();
   } finally {
     if (loadingStartedAt !== null) await finishAppLoading(loadingStartedAt);
   }
@@ -2238,9 +2238,11 @@ const studentActivityRenderers = createStudentActivityRenderers({
   occurrencesOf, activitiesOf, emptyState, fmtDate, monthLabel, badgeFor, todayISO, ICONS
 });
 
-function renderWelcomeRecovery() {
-  welcomeViewRenderer.renderWelcomeRecovery();
-  updateWelcomeBackupAction();
+async function renderWelcomeRecovery() {
+  await Promise.all([
+    welcomeViewRenderer.renderWelcomeRecovery(),
+    updateWelcomeBackupAction()
+  ]);
 }
 
 async function updateWelcomeBackupAction() {
