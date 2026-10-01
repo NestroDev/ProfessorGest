@@ -1,7 +1,7 @@
 export function createStudentActivityRenderers(deps) {
   const {
     getState, getCtx, esc, initials, classNameOf, studentStats, activityStats, activityStatus,
-    occurrencesOf, activitiesOf, emptyState, fmtDate, monthLabel, badgeFor, ICONS
+    occurrencesOf, activitiesOf, assignmentNameOf = () => '', emptyState, fmtDate, monthLabel, badgeFor, ICONS, searchFieldHTML
   } = deps;
 
   function filteredSortedStudents() {
@@ -48,11 +48,11 @@ export function createStudentActivityRenderers(deps) {
     const bulk = getCtx().bulkMode;
     return `
       <div class="page-head">
-        <div><h1>Alunos acompanhados</h1><div class="page-sub">${getState().students.length} aluno(s) no seu acompanhamento</div></div>
+        <div><h1>Alunos acompanhados</h1><div class="page-sub">${getState().students.length} ${getState().students.length === 1 ? 'aluno' : 'alunos'} no seu acompanhamento</div></div>
         <div class="page-actions"><button type="button" class="btn-secondary" id="btnToggleStudentBulk">${bulk ? 'Cancelar seleção' : 'Selecionar vários'}</button><button type="button" class="btn-primary" id="btnNewStudent">${ICONS.plus} Adicionar aluno</button></div>
       </div>
       <div class="filter-bar filter-bar-clean">
-        <div class="search-bar"><input class="form-input input-search" id="studentSearchInput" placeholder="Buscar aluno..." value="${esc(getCtx().studentSearch || '')}"></div>
+        ${searchFieldHTML('studentSearchInput', 'Pesquisar aluno...', getCtx().studentSearch || '')}
         <select class="form-select" id="studentClassFilterSelect"><option value="">Todas as turmas</option>${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().studentClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
         <select class="form-select" id="studentSortSelect"><option value="nome" ${getCtx().studentSort === 'nome' ? 'selected' : ''}>Nome</option><option value="turma" ${getCtx().studentSort === 'turma' ? 'selected' : ''}>Turma</option><option value="registros" ${getCtx().studentSort === 'registros' ? 'selected' : ''}>Mais acompanhados</option></select>
       </div>
@@ -97,7 +97,7 @@ export function createStudentActivityRenderers(deps) {
       if (getCtx().histMonth) filtered = filtered.filter(e => e.date.slice(0, 7) === getCtx().histMonth);
       body = `<div class="quick-options history-filters">${[{key:'todos',label:'Todos'},{key:'ocorrencia',label:'Ocorrências'},{key:'anotacao',label:'Observações'}].map(f => `<button type="button" class="quick-opt ${getCtx().histFilter === f.key ? 'selected' : ''}" data-hist-filter="${f.key}">${f.label}</button>`).join('')}</div>${months.length ? `<select class="form-select history-month" id="histMonthSelect"><option value="">Todos os períodos</option>${months.map(m => `<option value="${m}" ${getCtx().histMonth === m ? 'selected' : ''}>${monthLabel(m)}</option>`).join('')}</select>` : ''}<div class="card">${filtered.length ? timelineEntriesHTML(filtered) : emptyState('Nenhum registro encontrado para este filtro.')}</div>`;
     } else if (tab === 'atividades') {
-      body = `<div class="card list-card">${studentActivities(s).map(a => `<div class="list-item"><div class="list-item-main" data-open-activity="${esc(a.id)}" role="button" tabindex="0"><div class="list-item-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))} · ${fmtDate(a.dueDate)}</div></div><span class="badge ${activityStatus(getState(), a) === 'atrasada' ? 'badge-red' : 'badge-blue'}">${activityStatus(getState(), a) === 'atrasada' ? 'Atrasada' : 'Agendada'}</span></div>`).join('') || emptyState('Nenhuma atividade para a turma deste aluno.')}</div>`;
+      body = `<div class="card list-card">${studentActivities(s).map(a => `<div class="list-item"><div class="list-item-main" data-open-activity="${esc(a.id)}" role="button" tabindex="0"><div class="list-item-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))}${a.assignmentId ? ` · ${esc(assignmentNameOf(a.assignmentId))}` : ''} · ${fmtDate(a.dueDate)}</div></div><span class="badge ${activityStatus(getState(), a) === 'atrasada' ? 'badge-red' : 'badge-blue'}">${activityStatus(getState(), a) === 'atrasada' ? 'Atrasada' : 'Agendada'}</span></div>`).join('') || emptyState('Nenhuma atividade para a turma deste aluno.')}</div>`;
     } else if (tab === 'observacoes') {
       const obs = [...(s.observations || [])].sort((a, b) => b.date.localeCompare(a.date));
       body = `<div class="row-between compact-section-head"><div></div><button type="button" class="btn-primary btn-sm" id="btnNewObservation">${ICONS.plus} Nova observação</button></div><div class="card list-card">${obs.map(o => `<div class="list-item"><div class="list-item-main"><div><div class="timeline-date">${fmtDate(o.date)}</div><div class="timeline-text preserve-text">${esc(o.text)}</div></div></div><div class="list-item-actions"><button type="button" class="btn-icon" data-edit-obs="${esc(o.id)}" aria-label="Editar observação">${ICONS.edit}</button><button type="button" class="btn-icon danger" data-del-obs="${esc(o.id)}" aria-label="Excluir observação">${ICONS.trash}</button></div></div>`).join('') || emptyState('Nenhuma observação datada ainda.')}</div>`;
@@ -110,7 +110,7 @@ export function createStudentActivityRenderers(deps) {
 
   function activityListItemHTML(a) {
     const status = activityStatus(getState(), a);
-    return `<div class="list-item"><div class="list-item-main" data-open-activity="${esc(a.id)}" role="button" tabindex="0"><div class="list-item-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))} · ${fmtDate(a.dueDate)}</div></div><span class="badge ${status === 'atrasada' ? 'badge-red' : 'badge-blue'}">${status === 'atrasada' ? 'Atrasada' : 'Agendada'}</span><div class="list-item-actions"><button type="button" class="btn-icon danger" data-del-activity="${esc(a.id)}" aria-label="Excluir atividade">${ICONS.trash}</button></div></div>`;
+    return `<div class="list-item"><div class="list-item-main" data-open-activity="${esc(a.id)}" role="button" tabindex="0"><div class="list-item-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))}${a.assignmentId ? ` · ${esc(assignmentNameOf(a.assignmentId))}` : ''} · ${fmtDate(a.dueDate)}</div></div><span class="badge ${status === 'atrasada' ? 'badge-red' : 'badge-blue'}">${status === 'atrasada' ? 'Atrasada' : 'Agendada'}</span><div class="list-item-actions"><button type="button" class="btn-icon danger" data-del-activity="${esc(a.id)}" aria-label="Excluir atividade">${ICONS.trash}</button></div></div>`;
   }
 
   function filteredActivities() {
@@ -126,14 +126,14 @@ export function createStudentActivityRenderers(deps) {
 
   function renderAtividades() {
     const filters = [{ key: 'proximas', label: 'Próximas' }, { key: 'atrasadas', label: 'Atrasadas' }, { key: 'todas', label: 'Todas' }];
-    return `<div class="page-head"><div><h1>Atividades</h1><div class="page-sub">Planeje o que precisa acontecer, sem controlar entregas aluno a aluno.</div></div><div class="page-actions"><button type="button" class="btn-primary" id="btnNewActivity">${ICONS.plus} Nova atividade</button></div></div><div class="filter-bar"><div class="search-bar"><input class="form-input input-search" id="activitySearchInput" placeholder="Pesquisar atividade..." value="${esc(getCtx().activitySearch || '')}"></div><div class="chip-toggle-group">${filters.map(f => `<button type="button" class="chip-toggle ${getCtx().activityFilter === f.key ? 'active' : ''}" data-activity-filter="${f.key}">${f.label}</button>`).join('')}</div><select class="form-select" id="activityClassFilterSelect"><option value="">Todas as turmas</option>${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().activityClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="card list-card">${filteredActivities().map(activityListItemHTML).join('') || emptyState('Nenhuma atividade encontrada.')}</div>`;
+    return `<div class="page-head"><div><h1>Atividades</h1><div class="page-sub">Planeje o que precisa acontecer, sem controlar entregas aluno a aluno.</div></div><div class="page-actions"><button type="button" class="btn-primary" id="btnNewActivity">${ICONS.plus} Nova atividade</button></div></div><div class="filter-bar filter-bar-clean">${searchFieldHTML('activitySearchInput', 'Pesquisar atividade...', getCtx().activitySearch || '')}<div class="chip-toggle-group">${filters.map(f => `<button type="button" class="chip-toggle ${getCtx().activityFilter === f.key ? 'active' : ''}" data-activity-filter="${f.key}">${f.label}</button>`).join('')}</div><select class="form-select" id="activityClassFilterSelect"><option value="">Todas as turmas</option>${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().activityClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="card list-card">${filteredActivities().map(activityListItemHTML).join('') || emptyState('Nenhuma atividade encontrada.')}</div>`;
   }
 
   function renderAtividadeDetail() {
     const a = getState().activities.find(x => x.id === getCtx().activityId);
     if (!a) return emptyState('Atividade não encontrada.');
     const status = activityStatus(getState(), a);
-    return `<button type="button" class="btn-ghost btn-sm page-back" id="btnBack">${ICONS.back} Voltar</button><section class="card detail-hero-card"><div class="row-between"><div><div class="list-item-title detail-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))} · ${fmtDate(a.dueDate)}</div></div><button type="button" class="btn-secondary btn-sm" id="btnEditActivity">${ICONS.edit} Editar</button></div><div class="detail-status-line"><span class="badge ${status === 'atrasada' ? 'badge-red' : 'badge-blue'}">${status === 'atrasada' ? 'Atrasada' : 'Agendada'}</span></div>${a.description ? `<p class="detail-description">${esc(a.description)}</p>` : ''}</section><div class="card activity-guidance"><strong>Como usar</strong><p>Use atividades para organizar a agenda da turma. Acompanhe alunos individualmente por meio de ocorrências e observações, sem precisar manter uma lista completa da turma.</p></div>`;
+    return `<button type="button" class="btn-ghost btn-sm page-back" id="btnBack">${ICONS.back} Voltar</button><section class="card detail-hero-card"><div class="row-between"><div><div class="list-item-title detail-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))}${a.assignmentId ? ` · ${esc(assignmentNameOf(a.assignmentId))}` : ''} · ${fmtDate(a.dueDate)}</div></div><button type="button" class="btn-secondary btn-sm" id="btnEditActivity">${ICONS.edit} Editar</button></div><div class="detail-status-line"><span class="badge ${status === 'atrasada' ? 'badge-red' : 'badge-blue'}">${status === 'atrasada' ? 'Atrasada' : 'Agendada'}</span></div>${a.description ? `<p class="detail-description">${esc(a.description)}</p>` : ''}</section><div class="card activity-guidance"><strong>Como usar</strong><p>Use atividades para organizar a agenda da turma. Acompanhe alunos individualmente por meio de ocorrências e observações, sem precisar manter uma lista completa da turma.</p></div>`;
   }
 
   return { renderAlunos, renderAlunoDetail, renderAtividades, renderAtividadeDetail, activityListItemHTML, studentTimelineEntries, timelineEntriesHTML };

@@ -1,7 +1,7 @@
 /*
   ProfessorGest · Google Drive · configuração LOCAL
 
-  Copie este arquivo para ../google-drive-config.local.js.
+  Copie este arquivo para frontend/google-drive-config.local.js.
   O arquivo local está no .gitignore e nunca deve ser commitado.
 
   A API key é usada pelo Google Picker, portanto mantenha-a restrita

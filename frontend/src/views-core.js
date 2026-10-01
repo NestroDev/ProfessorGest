@@ -2,9 +2,9 @@ export function createCoreViewRenderers(api) {
   const {
     getState, getCtx, setLastAttentionItems,
     activeStudents, activeActivities, activeClasses,
-    classStats, studentById, classNameOf,
+    classStats, studentById, classNameOf, assignmentsOf = () => [], schoolById = () => null,
     attentionItems, todayISO, greeting, esc, fmtDate,
-    emptyState, badgeFor, ICONS
+    emptyState, badgeFor, ICONS, searchFieldHTML, driveBindingForCurrentProject = () => null, getDriveActionPending = () => false, getDriveSyncPending = () => false
   } = api;
 
   function renderDashboard() {
@@ -29,7 +29,7 @@ export function createCoreViewRenderers(api) {
         <div>
           <div class="eyebrow">ProfessorGest</div>
           <h1>${greeting()}, ${esc((state.teacher && state.teacher.name) || 'Professor(a)')}</h1>
-          <p class="page-sub">${classes.length} turma(s) · ${students.length} aluno(s) sob acompanhamento</p>
+          <p class="page-sub">${(state.schools||[]).length} ${(state.schools||[]).length === 1 ? 'escola' : 'escolas'} · ${(state.assignments||[]).length} ${(state.assignments||[]).length === 1 ? 'disciplina' : 'disciplinas'} · ${classes.length} ${classes.length === 1 ? 'turma' : 'turmas'}</p>
         </div>
         <div class="dashboard-quick-actions">
           <button type="button" class="btn-primary" id="btnQuickRegisterTop">${ICONS.plus} Registrar ocorrência</button>
@@ -37,8 +37,26 @@ export function createCoreViewRenderers(api) {
         </div>
       </section>
 
+      ${driveBindingForCurrentProject() && getDriveSyncPending() ? `
+      <section class="dashboard-drive-promo card">
+        <div class="dashboard-drive-promo-icon">${ICONS.cloud}</div>
+        <div class="dashboard-drive-promo-copy">
+          <strong>Há alterações para atualizar no Google Drive</strong>
+          <span>O projeto já está salvo neste dispositivo. Atualize o Drive manualmente quando quiser enviar esta versão.</span>
+        </div>
+        <button type="button" class="btn-secondary" id="btnDashboardDrive" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Atualizando…' : ICONS.cloud + ' Atualizar Drive'}</button>
+      </section>` : (!driveBindingForCurrentProject() ? `
+      <section class="dashboard-drive-promo card">
+        <div class="dashboard-drive-promo-icon">${ICONS.cloud}</div>
+        <div class="dashboard-drive-promo-copy">
+          <strong>Proteja seu projeto com o Google Drive</strong>
+          <span>Envie este arquivo para a nuvem quando quiser continuar seu trabalho em outro computador ou celular.</span>
+        </div>
+        <button type="button" class="btn-secondary" id="btnDashboardDrive" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Atualizando…' : ICONS.cloud + ' Conectar Google Drive'}</button>
+      </section>` : '')}
+
       <div class="dashboard-stats">
-        <div class="card dashboard-stat"><div class="stat-icon">${ICONS.users}</div><div><strong>${classes.length}</strong><span>Turmas ativas</span></div></div>
+        <div class="card dashboard-stat"><div class="stat-icon">${ICONS.users}</div><div><strong>${classes.length}</strong><span>Turmas ativas</span></div></div><div class="card dashboard-stat"><div class="stat-icon">${ICONS.school}</div><div><strong>${(state.schools||[]).length}</strong><span>Escolas</span></div></div>
         <div class="card dashboard-stat"><div class="stat-icon">${ICONS.user}</div><div><strong>${students.length}</strong><span>Alunos acompanhados</span></div></div>
         <div class="card dashboard-stat"><div class="stat-icon">${ICONS.bell}</div><div><strong>${(state.occurrences || []).length}</strong><span>Registros feitos</span></div></div>
         <div class="card dashboard-stat"><div class="stat-icon">${ICONS.calendar}</div><div><strong>${upcoming.length}</strong><span>Próximas atividades</span></div></div>
@@ -89,8 +107,8 @@ export function createCoreViewRenderers(api) {
             const st = classStats(c);
             return `<div class="card card-clickable dashboard-class-card" data-open-class="${esc(c.id)}" role="button" tabindex="0">
               <div class="list-item-title">${esc(c.name)}</div>
-              <div class="list-item-sub">${st.alunos.length} aluno(s) acompanhado(s)</div>
-              <div class="dashboard-class-meta"><span>${st.occCount} registro(s)</span>${st.upcoming ? `<span>Próxima: ${fmtDate(st.upcoming.dueDate)}</span>` : '<span>Sem atividade próxima</span>'}</div>
+              <div class="list-item-sub">${st.alunos.length} ${st.alunos.length === 1 ? 'aluno' : 'alunos'} acompanhado${st.alunos.length === 1 ? '' : 's'}</div>
+              <div class="dashboard-class-meta"><span>${st.occCount} ${st.occCount === 1 ? 'registro' : 'registros'}</span>${st.upcoming ? `<span>Próxima: ${fmtDate(st.upcoming.dueDate)}</span>` : '<span>Sem atividade próxima</span>'}</div>
             </div>`;
           }).join('') || emptyState('Nenhuma turma cadastrada ainda.')}
         </div>
@@ -106,30 +124,22 @@ export function createCoreViewRenderers(api) {
   }
 
   function renderTurmas() {
-    const state = getState();
-    const ctx = getCtx();
-    const showArchived = !!ctx.showArchivedClasses;
-    const search = (ctx.classSearch || '').trim().toLowerCase();
-    const source = showArchived ? state.classes : activeClasses();
-    const list = source.filter(c => !search || c.name.toLowerCase().includes(search));
-    return `
-      <div class="page-head">
-        <div><h1>Turmas</h1><div class="page-sub">${activeClasses().length} turma(s) ativa(s)</div></div>
-        <div class="page-actions"><button type="button" class="btn-ghost btn-sm" id="btnToggleArchivedClasses">${showArchived ? 'Ocultar arquivadas' : 'Mostrar arquivadas'}</button><button type="button" class="btn-primary" id="btnNewClass">${ICONS.plus} Nova turma</button></div>
-      </div>
-      <div class="filter-bar filter-bar-clean"><div class="search-bar"><input class="form-input input-search" id="classSearchInput" placeholder="Pesquisar turma..." value="${esc(ctx.classSearch || '')}"></div></div>
-      <div class="grid grid-3">
-        ${list.map(c => {
-          const st = classStats(c);
-          return `<div class="card">
-            <div class="row-between"><div class="list-item-main" data-open-class="${esc(c.id)}" role="button" tabindex="0"><div class="list-item-title">${esc(c.name)} ${c.archived ? '<span class="badge badge-gray">Arquivada</span>' : ''}</div><div class="list-item-sub">${st.alunos.length} aluno(s) · ${st.occCount} registro(s)</div></div>
-              <div class="list-item-actions"><button type="button" class="btn-icon" data-edit-class="${esc(c.id)}" aria-label="Editar turma">${ICONS.edit}</button><button type="button" class="btn-icon" data-dup-class="${esc(c.id)}" aria-label="Duplicar turma">${ICONS.copy}</button><button type="button" class="btn-icon" data-archive-class="${esc(c.id)}" aria-label="Arquivar turma">${ICONS.archive}</button><button type="button" class="btn-icon danger" data-del-class="${esc(c.id)}" aria-label="Excluir turma">${ICONS.trash}</button></div>
-            </div>
-            <div class="class-card-meta">${st.upcoming ? `<span>Próxima atividade: ${fmtDate(st.upcoming.dueDate)}</span>` : '<span>Nenhuma atividade próxima</span>'}</div>
-          </div>`;
-        }).join('') || emptyState('Nenhuma turma cadastrada.', 'Clique em “Nova turma” para começar.')}
-      </div>`;
+    const state=getState(),ctx=getCtx(),showArchived=!!ctx.showArchivedClasses,search=(ctx.classSearch||'').trim().toLowerCase(),componentFilter=ctx.classComponentFilter||'',schoolFilter=ctx.classSchoolFilter||'',yearFilter=ctx.classYearFilter||'';
+    const source=showArchived?state.classes:activeClasses(state);
+    const components=[...new Set((state.assignments||[]).map(a=>a?.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const schools=(state.schools||[]).map(s=>s.name).filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const years=[...new Set(state.classes.map(c=>c?.year||c?.ded?.year).filter(Boolean))].sort((a,b)=>String(b).localeCompare(String(a)));
+    const list=source.filter(c=>{const school=schoolById(c.schoolId)||state.schools?.find(s=>s.name===c?.ded?.schoolName);const assigns=assignmentsOf(c.id,state);const subjects=assigns.map(a=>a.subject);const hay=[c.name,school?.name,c.year,c.ded?.year,...subjects].filter(Boolean).join(' ').toLowerCase();return(!search||hay.includes(search))&&(!componentFilter||subjects.includes(componentFilter))&&(!schoolFilter||school?.name===schoolFilter)&&(!yearFilter||String(c.year||c.ded?.year||'')===yearFilter);});
+    return `<div class="page-head"><div><h1>Turmas</h1><div class="page-sub">${activeClasses(state).length} ${activeClasses(state).length === 1 ? 'turma ativa' : 'turmas ativas'} · ${(state.assignments||[]).length} ${(state.assignments||[]).length === 1 ? 'disciplina' : 'disciplinas'}</div></div><div class="page-actions"><button type="button" class="btn-ghost btn-sm" id="btnToggleArchivedClasses">${showArchived?'Ocultar arquivadas':'Mostrar arquivadas'}</button><button type="button" class="btn-primary" id="btnNewClass">${ICONS.plus} Adicionar turma</button></div></div>
+      <div class="filter-bar filter-bar-clean class-filter-bar">${searchFieldHTML('classSearchInput', 'Pesquisar turma, escola ou disciplina...', ctx.classSearch || '')}${components.length?`<select class="form-select filter-select" id="classComponentFilter"><option value="">Todas as disciplinas</option>${components.map(v=>`<option value="${esc(v)}" ${v===componentFilter?'selected':''}>${esc(v)}</option>`).join('')}</select>`:''}${schools.length?`<select class="form-select filter-select" id="classSchoolFilter"><option value="">Todas as escolas</option>${schools.map(v=>`<option value="${esc(v)}" ${v===schoolFilter?'selected':''}>${esc(v)}</option>`).join('')}</select>`:''}${years.length?`<select class="form-select filter-select filter-select-sm" id="classYearFilter"><option value="">Todos os anos</option>${years.map(v=>`<option value="${esc(v)}" ${v===yearFilter?'selected':''}>${esc(v)}</option>`).join('')}</select>`:''}</div>
+      <div class="grid grid-3">${list.map(c=>{const st=classStats(c),school=schoolById(c.schoolId)||state.schools?.find(s=>s.name===c?.ded?.schoolName),assigns=assignmentsOf(c.id,state),subjects=assigns.map(a=>a.subject).filter(Boolean);return `<div class="card"><div class="row-between"><div class="list-item-main" data-open-class="${esc(c.id)}" role="button" tabindex="0"><div class="list-item-title">${esc(c.name)} ${c.archived?'<span class="badge badge-gray">Arquivada</span>':''}</div><div class="list-item-sub">${st.alunos.length} ${st.alunos.length === 1 ? 'aluno' : 'alunos'} · ${st.occCount} ${st.occCount === 1 ? 'registro' : 'registros'}</div></div><div class="list-item-actions"><button type="button" class="btn-icon" data-edit-class="${esc(c.id)}" aria-label="Editar turma">${ICONS.edit}</button><button type="button" class="btn-icon" data-dup-class="${esc(c.id)}" aria-label="Duplicar turma">${ICONS.copy}</button><button type="button" class="btn-icon" data-archive-class="${esc(c.id)}" aria-label="Arquivar turma">${ICONS.archive}</button><button type="button" class="btn-icon danger" data-del-class="${esc(c.id)}" aria-label="Excluir turma">${ICONS.trash}</button></div></div><div class="class-card-meta"><span>${esc(school?.name||'Escola não informada')}</span><span>${esc(c.year||c.ded?.year||'Ano não informado')}</span><span>${esc(c.shift||c.ded?.shift||'Turno não informado')}</span></div>${subjects.length?`<div class="class-card-subjects">${subjects.map(v=>`<span class="badge badge-blue">${esc(v)}</span>`).join('')}</div>`:'<div class="class-card-meta"><span>Nenhuma disciplina definida</span></div>'}${c.ded?.classCode?`<div class="class-card-source">DED+ · ${esc(c.ded.classCode)}</div>`:''}</div>`;}).join('')||emptyState('Nenhuma turma encontrada.','Ajuste os filtros ou adicione uma nova turma.')}</div>`;
   }
 
-  return { renderDashboard, renderTurmas };
+  function renderEscolas() {
+    const state=getState(); const schools=Array.isArray(state.schools)?state.schools:[];
+    return `<div class="page-head"><div><h1>Escolas</h1><div class="page-sub">Organize onde você atua e veja as disciplinas e turmas vinculadas.</div></div></div><div class="grid grid-2">${schools.map(school=>{const classes=state.classes.filter(c=>c.schoolId===school.id||c?.ded?.schoolName===school.name);const assignments=state.assignments.filter(a=>a.schoolId===school.id||classes.some(c=>c.id===a.classId));const subjects=[...new Set(assignments.map(a=>a.subject).filter(Boolean))];return `<section class="card"><div class="row-between"><div><div class="list-item-title">${esc(school.name)}</div><div class="list-item-sub">${classes.length} ${classes.length === 1 ? 'turma' : 'turmas'} · ${subjects.length} ${subjects.length === 1 ? 'disciplina' : 'disciplinas'}</div></div></div><div class="class-card-meta">${school.code?`<span>Código ${esc(school.code)}</span>`:''}${school.sre?`<span>SRE ${esc(school.sre)}</span>`:''}</div><div class="class-card-subjects">${subjects.map(v=>`<span class="badge badge-blue">${esc(v)}</span>`).join('')||'<span class="muted">Nenhuma disciplina cadastrada</span>'}</div><div class="list-card compact-list">${classes.map(c=>`<div class="list-item"><div class="list-item-main" data-open-class="${esc(c.id)}" role="button" tabindex="0"><div class="list-item-title">${esc(c.name)}</div><div class="list-item-sub">${esc(c.year||'Ano não informado')} · ${esc(c.shift||'Turno não informado')}</div></div></div>`).join('')||emptyState('Nenhuma turma nesta escola.')}</div></section>`;}).join('')||emptyState('Nenhuma escola cadastrada.','As escolas serão criadas automaticamente ao importar dados do DED+.')}</div>`;
+  }
+
+  return { renderDashboard, renderTurmas, renderEscolas };
+
 }

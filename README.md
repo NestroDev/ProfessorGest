@@ -7,13 +7,13 @@ Aplicativo PWA local-first para organização e acompanhamento pedagógico.
 O projeto é dividido em duas partes:
 
 ```text
-frontend/   → PWA, interface, IndexedDB, arquivos .prof, Service Worker e cliente de API
+frontend/   → PWA, interface, IndexedDB, arquivos .prg, Service Worker e cliente de API
 backend/    → API HTTP stateless para serviços que realmente dependem de servidor
 ```
 
-O projeto continua **local-first**. O arquivo `.prof` pertence ao usuário e continua sendo a fonte principal dos dados. O IndexedDB é usado para apoio local, recuperação e cache limitado. O Google Drive é opcional.
+O projeto continua **local-first**. O arquivo `.prg` pertence ao usuário e continua sendo a fonte principal dos dados. O IndexedDB é usado para apoio local, recuperação e cache limitado. O Google Drive é opcional.
 
-O frontend não precisa do backend para abrir, editar, salvar ou exportar um `.prof`.
+O frontend não precisa do backend para abrir, editar, salvar ou exportar um `.prg`.
 
 ## API
 
@@ -45,7 +45,7 @@ Por padrão ela escuta em `http://127.0.0.1:8787`.
 
 Quando necessário, o frontend pode usar a API através de `window.PROFESSORGEST_API_BASE_URL`. O acesso é centralizado em `frontend/src/services/api-client.js`; chamadas de domínio não devem espalhar `fetch()` diretamente pelas views.
 
-A API atual é deliberadamente pequena e stateless. Ela é **opcional**: o ProfessorGest funciona no GitHub Pages sem qualquer backend hospedado. Não existe sincronização obrigatória nem armazenamento automático de todos os arquivos `.prof` em um servidor.
+A API atual é deliberadamente pequena e stateless. Ela é **opcional**: o ProfessorGest funciona no GitHub Pages sem qualquer backend hospedado. Não existe sincronização obrigatória nem armazenamento automático de todos os arquivos `.prg` em um servidor.
 
 Para usar um backend opcional em uma implantação, configure a variável pública de repositório `PROFESSORGEST_API_BASE_URL` com uma URL HTTPS. Sem essa variável, o cliente de API permanece desativado.
 
@@ -61,13 +61,7 @@ PROFESSORGEST_GOOGLE_API_KEY
 
 Se o secret não existir, o deploy continua normalmente e o restante do aplicativo permanece funcional; apenas a integração com Drive fica desativada. O workflow injeta a chave somente no artefato de publicação, nunca no repositório.
 
-Para desenvolvimento local, copie:
-
-```text
-config/google-drive-config.local.example.js
-```
-
-para um arquivo local de configuração e mantenha a chave fora do controle de versão. O arquivo local é ignorado pelo `.gitignore`.
+Para desenvolvimento local, copie `config/google-drive-config.local.example.js` para `frontend/google-drive-config.local.js` e mantenha a chave fora do controle de versão. Esse arquivo local é ignorado pelo `.gitignore` e não faz parte do projeto distribuído.
 
 ## Navegação e sessão
 
@@ -87,7 +81,6 @@ Um aluno pode ser criado diretamente durante o registro de uma ocorrência. Depo
 
 Atividades são tratadas como itens de agenda pedagógica, com nome, turma, data e descrição. O antigo fluxo de controle de entrega individual não faz mais parte do fluxo principal.
 
-Arquivos `.prof` v3 que ainda contenham marcações antigas de entrega continuam podendo ser importados; esses campos são ignorados com aviso, em vez de causar uma falha silenciosa.
 
 ## PWA e mobile
 
@@ -97,7 +90,7 @@ Os documentos públicos de Termos e Privacidade usam o mesmo sistema visual e re
 
 ## GitHub Pages
 
-O diretório `dist/` é gerado durante o build e **não deve ser versionado**.
+O diretório `dist/` é gerado durante o build e **não deve ser versionado nem incluído no pacote-fonte**.
 
 Gerar o artefato:
 
@@ -107,7 +100,7 @@ npm run build:pages
 
 O GitHub Actions publica somente o artefato gerado para Pages.
 
-No repositório devem permanecer o código-fonte, testes, scripts, documentação e arquivos de configuração seguros. Dados de usuário, arquivos `.prof`, logs, ZIPs e configurações locais não devem ser enviados.
+No repositório devem permanecer o código-fonte, testes, scripts, documentação e arquivos de configuração seguros. Dados de usuário, arquivos `.prg`, logs, ZIPs e configurações locais não devem ser enviados.
 
 ## QA
 
@@ -123,7 +116,7 @@ Ele executa:
 2. geração do artefato do GitHub Pages;
 3. suíte automatizada.
 
-A suíte cobre modelo `.prof`, persistência local, Drive, I/O de arquivos, navegação, modais, views, PWA, acessibilidade estrutural, salvamento e integridade do release.
+A suíte cobre modelo `.prg`, persistência local, Drive, I/O de arquivos, navegação, modais, views, PWA, acessibilidade estrutural, salvamento e integridade do release.
 
 O teste de artefato também pode ser executado diretamente com:
 
@@ -132,3 +125,11 @@ npm test
 ```
 
 A validação final em navegador real, especialmente permissões do Google Drive e comportamento do Web App instalado no Android, continua sendo uma etapa manual.
+
+## Integração com DED+
+
+- A tela inicial permite criar um novo arquivo a partir de um ou vários PDFs de turmas exportados pelo DED+.
+- A aba **Turmas** permite adicionar novas turmas do DED+ sem substituir as existentes.
+- Turmas vinculadas ao DED+ podem ser atualizadas posteriormente por meio de **Atualizar com DED**.
+- A atualização usa os códigos do DED para reconhecer alunos e preserva alunos que não aparecem no PDF atual, evitando perda de histórico.
+- O projeto mantém os metadados de escola, turma, ano, turno, componente e código do DED por turma.

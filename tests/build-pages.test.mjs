@@ -37,7 +37,7 @@ test('GitHub Pages artifact contains only publishable root files and src modules
   const names = new Set(entries.map(entry => entry.name));
 
   for (const name of required) assert.ok(names.has(name), `missing dist/${name}`);
-  assert.deepEqual(names, new Set([...required, 'src']));
+  assert.deepEqual(names, new Set([...required, 'src', ...(names.has('vendor') ? ['vendor'] : [])]));
 
   const srcEntries = await readdir(join(dist, 'src'), { withFileTypes: true });
   assert.ok(srcEntries.length > 0);
@@ -55,6 +55,11 @@ test('GitHub Pages artifact contains only publishable root files and src modules
   const apiConfig = await (await import('node:fs/promises')).readFile(join(dist, 'api-config.js'), 'utf8');
   assert.match(apiConfig, /PROFESSORGEST_API_BASE_URL/);
   assert.match(apiConfig, /= ''/);
+
+  const driveAccountModule = await (await import('node:fs/promises')).readFile(join(dist, 'src', 'drive-account.js'), 'utf8');
+  assert.match(driveAccountModule, /DRIVE_ACCOUNT_KEY/);
+  const sw = await (await import('node:fs/promises')).readFile(join(dist, 'sw.js'), 'utf8');
+  assert.match(sw, /src\/drive-account\.js/);
 
   const localConfig = await (await import('node:fs/promises')).readFile(join(dist, 'google-drive-config.local.js'), 'utf8');
   assert.doesNotMatch(localConfig, /SUA_API_KEY_LOCAL_RESTRITA/);

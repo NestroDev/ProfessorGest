@@ -1,40 +1,436 @@
 export function createClassViewRenderers(deps) {
   const {
-    getState, getCtx, classById, classStats, studentsOf, occurrencesOf, studentById,
-    initials, activityListItemHTML, esc, fmtDate, todayISO, emptyState, badgeFor, ICONS
+    getState,
+    getCtx,
+    classById,
+    classStats,
+    studentsOf,
+    occurrencesOf,
+    studentById,
+    assignmentsOf = () => [],
+    schoolNameOf = () => 'Escola não informada',
+    assignmentById = () => null,
+    initials,
+    activityListItemHTML,
+    esc,
+    fmtDate,
+    todayISO,
+    emptyState,
+    badgeFor,
+    ICONS,
   } = deps;
 
-  function renderClassStudentsTab(c) {
-    const alunos = studentsOf(c.id);
-    const bulk = getCtx().bulkMode;
-    return `<div class="row-between compact-section-head"><div><strong>${alunos.length}</strong> aluno(s) acompanhado(s)</div><div class="inline-actions"><button type="button" class="btn-ghost btn-sm" id="btnToggleBulk">${bulk ? 'Cancelar seleção' : 'Selecionar vários'}</button><button type="button" class="btn-primary btn-sm" id="btnAddStudentHere">${ICONS.plus} Aluno</button></div></div>
-      ${bulk ? `<div class="bulk-bar student-bulk-bar"><div><strong>${getCtx().bulkSelected.size} selecionado(s)</strong></div><div class="bulk-bar-actions"><button type="button" class="btn-secondary btn-sm" id="btnBulkSelectAll">Selecionar todos</button><button type="button" class="btn-secondary btn-sm" id="btnBulkOccurrence">${ICONS.bell} Registrar ocorrência</button><button type="button" class="btn-secondary btn-sm" id="btnBulkMoveStudents">${ICONS.move} Mudar de turma</button><button type="button" class="btn-danger-solid btn-sm" id="btnBulkDelete">${ICONS.trash} Excluir</button><button type="button" class="btn-ghost btn-sm" id="btnBulkClear">Limpar</button></div></div>` : ''}
-      <div class="card list-card">${alunos.map(s => `<div class="list-item">${bulk ? `<label class="list-item-check"><input type="checkbox" data-bulk-student="${esc(s.id)}" ${getCtx().bulkSelected.has(s.id) ? 'checked' : ''} aria-label="Selecionar ${esc(s.name)}"></label>` : ''}<div class="list-item-main" data-open-student="${esc(s.id)}" role="button" tabindex="0"><div class="avatar sm">${initials(s.name)}</div><div><div class="list-item-title">${esc(s.name)}</div><div class="list-item-sub">${occurrencesOf(s.id).length} registro(s) de acompanhamento</div></div></div>${bulk ? '' : `<div class="list-item-actions"><button type="button" class="btn-icon" data-edit-student="${esc(s.id)}" aria-label="Editar aluno">${ICONS.edit}</button><button type="button" class="btn-icon danger" data-del-student="${esc(s.id)}" aria-label="Excluir aluno">${ICONS.trash}</button></div>`}</div>`).join('') || emptyState('Nenhum aluno acompanhado nesta turma ainda.', 'Adicione alunos quando precisar acompanhar alguém.')}</div>`;
+  function renderClassStudentsTab(classroom) {
+    const alunos = studentsOf(classroom.id);
+    const ctx = getCtx();
+    const bulk = ctx.bulkMode;
+
+    return `
+      <div class="row-between compact-section-head">
+        <div>
+          <strong>${alunos.length}</strong>
+          ${alunos.length === 1 ? 'aluno acompanhado' : 'alunos acompanhados'}
+        </div>
+        <div class="inline-actions">
+          <button type="button" class="btn-ghost btn-sm" id="btnToggleBulk">
+            ${bulk ? 'Cancelar seleção' : 'Selecionar vários'}
+          </button>
+          <button type="button" class="btn-primary btn-sm" id="btnAddStudentHere">
+            ${ICONS.plus} Aluno
+          </button>
+        </div>
+      </div>
+      ${
+        bulk
+          ? `
+            <div class="bulk-bar student-bulk-bar">
+              <div>
+                <strong>
+                  ${ctx.bulkSelected.size}
+                  ${ctx.bulkSelected.size === 1 ? 'selecionado' : 'selecionados'}
+                </strong>
+              </div>
+              <div class="bulk-bar-actions">
+                <button type="button" class="btn-secondary btn-sm" id="btnBulkSelectAll">
+                  Selecionar todos
+                </button>
+                <button type="button" class="btn-secondary btn-sm" id="btnBulkOccurrence">
+                  ${ICONS.bell} Registrar ocorrência
+                </button>
+                <button type="button" class="btn-secondary btn-sm" id="btnBulkMoveStudents">
+                  ${ICONS.move} Mudar de turma
+                </button>
+                <button type="button" class="btn-danger-solid btn-sm" id="btnBulkDelete">
+                  ${ICONS.trash} Excluir
+                </button>
+                <button type="button" class="btn-ghost btn-sm" id="btnBulkClear">
+                  Limpar
+                </button>
+              </div>
+            </div>
+          `
+          : ''
+      }
+      <div class="card list-card">
+        ${
+          alunos
+            .map(student => {
+              const occurrenceCount = occurrencesOf(student.id).length;
+
+              return `
+                <div class="list-item">
+                  ${
+                    bulk
+                      ? `
+                        <label class="list-item-check">
+                          <input
+                            type="checkbox"
+                            data-bulk-student="${esc(student.id)}"
+                            ${ctx.bulkSelected.has(student.id) ? 'checked' : ''}
+                            aria-label="Selecionar ${esc(student.name)}"
+                          >
+                        </label>
+                      `
+                      : ''
+                  }
+                  <div
+                    class="list-item-main"
+                    data-open-student="${esc(student.id)}"
+                    role="button"
+                    tabindex="0"
+                  >
+                    <div class="avatar sm">${initials(student.name)}</div>
+                    <div>
+                      <div class="list-item-title">${esc(student.name)}</div>
+                      <div class="list-item-sub">
+                        ${occurrenceCount}
+                        ${occurrenceCount === 1 ? 'registro' : 'registros'} de acompanhamento
+                      </div>
+                    </div>
+                  </div>
+                  ${
+                    bulk
+                      ? ''
+                      : `
+                        <div class="list-item-actions">
+                          <button
+                            type="button"
+                            class="btn-icon"
+                            data-edit-student="${esc(student.id)}"
+                            aria-label="Editar aluno"
+                          >
+                            ${ICONS.edit}
+                          </button>
+                          <button
+                            type="button"
+                            class="btn-icon danger"
+                            data-del-student="${esc(student.id)}"
+                            aria-label="Excluir aluno"
+                          >
+                            ${ICONS.trash}
+                          </button>
+                        </div>
+                      `
+                  }
+                </div>
+              `;
+            })
+            .join('') ||
+          emptyState(
+            'Nenhum aluno acompanhado nesta turma ainda.',
+            'Adicione alunos quando precisar acompanhar alguém.',
+          )
+        }
+      </div>
+    `;
   }
 
   function renderTurmaDetail() {
     const ctx = getCtx();
     const state = getState();
-    const c = classById(ctx.classId);
-    if (!c) return emptyState('Turma não encontrada.');
-    const st = classStats(c);
+    const classroom = classById(ctx.classId);
+
+    if (!classroom) return emptyState('Turma não encontrada.');
+
+    const assignments = assignmentsOf(classroom.id);
+    const selected =
+      assignmentById(ctx.assignmentId) || assignments[0] || null;
+
+    if (selected && ctx.assignmentId !== selected.id) {
+      ctx.assignmentId = selected.id;
+    }
+
+    const stats = classStats(classroom, selected?.id);
     const tab = ctx.classTab || 'visao';
-    const tabs = [{ key:'visao',label:'Visão geral' },{ key:'alunos',label:'Alunos' },{ key:'atividades',label:'Atividades' },{ key:'ocorrencias',label:'Registros' },{ key:'relatorios',label:'Relatórios' }];
+    const tabs = [
+      { key: 'visao', label: 'Visão geral' },
+      { key: 'alunos', label: 'Alunos' },
+      { key: 'atividades', label: 'Atividades' },
+      { key: 'ocorrencias', label: 'Registros' },
+      { key: 'relatorios', label: 'Relatórios' },
+    ];
+
     let body = '';
+
     if (tab === 'visao') {
-      const upcomingActs = st.acts.filter(a => a.dueDate >= todayISO()).sort((a,b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 5);
-      const ids = new Set(st.alunos.map(s => s.id));
-      const recentOcc = state.occurrences.filter(o => ids.has(o.studentId)).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 5);
-      body = `<div class="dashboard-stats class-detail-stats"><div class="card dashboard-stat"><div class="stat-icon">${ICONS.user}</div><div><strong>${st.alunos.length}</strong><span>Alunos acompanhados</span></div></div><div class="card dashboard-stat"><div class="stat-icon">${ICONS.clipboard}</div><div><strong>${st.acts.length}</strong><span>Atividades agendadas</span></div></div><div class="card dashboard-stat"><div class="stat-icon">${ICONS.bell}</div><div><strong>${st.occCount}</strong><span>Registros</span></div></div></div><div class="dashboard-grid"><section><div class="section-heading"><div><h2>Próximas atividades</h2><p>Agenda desta turma.</p></div></div><div class="card list-card">${upcomingActs.map(a => activityListItemHTML(a)).join('') || emptyState('Nenhuma atividade futura.')}</div></section><section><div class="section-heading"><div><h2>Registros recentes</h2><p>Últimos acompanhamentos.</p></div></div><div class="card list-card">${recentOcc.map(o => { const s = studentById(o.studentId); return `<div class="list-item"><div class="list-item-main" data-open-student="${esc(o.studentId)}" role="button" tabindex="0"><div class="list-item-title">${esc(s ? s.name : 'Aluno removido')}</div><div class="list-item-sub">${fmtDate(o.date)} · ${badgeFor(o.type)}</div></div></div>`; }).join('') || emptyState('Nenhum registro ainda.')}</div></section></div>`;
-    } else if (tab === 'alunos') body = renderClassStudentsTab(c);
-    else if (tab === 'atividades') body = `<div class="row-between compact-section-head"><div></div><button type="button" class="btn-primary btn-sm" id="btnNewActivityHere">${ICONS.plus} Nova atividade</button></div><div class="card list-card">${st.acts.map(activityListItemHTML).join('') || emptyState('Nenhuma atividade nesta turma.')}</div>`;
-    else if (tab === 'ocorrencias') {
-      const ids = new Set(st.alunos.map(s => s.id));
-      const occ = state.occurrences.filter(o => ids.has(o.studentId)).sort((a,b) => b.date.localeCompare(a.date));
-      body = `<div class="card list-card">${occ.map(o => { const s = studentById(o.studentId); return `<div class="list-item"><div class="list-item-main" data-open-student="${esc(o.studentId)}" role="button" tabindex="0"><div class="list-item-title">${esc(s ? s.name : 'Aluno removido')}</div><div class="list-item-sub">${fmtDate(o.date)} · ${badgeFor(o.type)}${o.description ? ` · ${esc(o.description)}` : ''}</div></div></div>`; }).join('') || emptyState('Nenhum registro para esta turma.')}</div>`;
-    } else body = `<div class="card narrow-card"><p class="muted">Gere um relatório com os alunos acompanhados, atividades, ocorrências e observações da turma.</p><button type="button" class="btn-primary btn-block" id="btnGoClassReport">${ICONS.report} Gerar relatório da turma</button></div>`;
-    return `<button type="button" class="btn-ghost btn-sm page-back" id="btnBack">${ICONS.back} Voltar</button><section class="card detail-hero-card class-detail-hero"><div class="row-between"><div><div class="list-item-title detail-title">${esc(c.name)} ${c.archived ? '<span class="badge badge-gray">Arquivada</span>' : ''}</div><div class="list-item-sub">${st.alunos.length} aluno(s) acompanhado(s)</div></div><div class="inline-actions"><button type="button" class="btn-primary btn-sm" id="btnRegisterForClass">${ICONS.plus} Registrar</button><button type="button" class="btn-secondary btn-sm" id="btnEditThisClass">${ICONS.edit} Editar</button></div></div></section><div class="tabs responsive-tabs">${tabs.map(t => `<button type="button" class="tab ${tab === t.key ? 'active' : ''}" data-class-tab="${esc(t.key)}">${t.label}</button>`).join('')}</div>${body}`;
+      const upcomingActivities = stats.acts
+        .filter(activity => activity.dueDate >= todayISO())
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+        .slice(0, 5);
+      const studentIds = new Set(stats.alunos.map(student => student.id));
+      const recentOccurrences = state.occurrences
+        .filter(
+          occurrence =>
+            studentIds.has(occurrence.studentId) &&
+            (!selected || occurrence.assignmentId === selected.id),
+        )
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 5);
+
+      body = `
+        <div class="dashboard-stats class-detail-stats">
+          <div class="card dashboard-stat">
+            <div class="stat-icon">${ICONS.user}</div>
+            <div>
+              <strong>${stats.alunos.length}</strong>
+              <span>Alunos acompanhados</span>
+            </div>
+          </div>
+          <div class="card dashboard-stat">
+            <div class="stat-icon">${ICONS.clipboard}</div>
+            <div>
+              <strong>${stats.acts.length}</strong>
+              <span>Atividades</span>
+            </div>
+          </div>
+          <div class="card dashboard-stat">
+            <div class="stat-icon">${ICONS.bell}</div>
+            <div>
+              <strong>${stats.occCount}</strong>
+              <span>Registros</span>
+            </div>
+          </div>
+        </div>
+        <div class="dashboard-grid">
+          <section>
+            <div class="section-heading">
+              <div>
+                <h2>Próximas atividades</h2>
+                <p>
+                  ${
+                    selected
+                      ? `Agenda de ${esc(selected.subject)}.`
+                      : 'Agenda desta turma.'
+                  }
+                </p>
+              </div>
+            </div>
+            <div class="card list-card">
+              ${
+                upcomingActivities.map(activity => activityListItemHTML(activity)).join('') ||
+                emptyState('Nenhuma atividade futura.')
+              }
+            </div>
+          </section>
+          <section>
+            <div class="section-heading">
+              <div>
+                <h2>Registros recentes</h2>
+                <p>Últimos acompanhamentos.</p>
+              </div>
+            </div>
+            <div class="card list-card">
+              ${
+                recentOccurrences
+                  .map(occurrence => {
+                    const student = studentById(occurrence.studentId);
+                    return `
+                      <div class="list-item">
+                        <div
+                          class="list-item-main"
+                          data-open-student="${esc(occurrence.studentId)}"
+                          role="button"
+                          tabindex="0"
+                        >
+                          <div class="list-item-title">
+                            ${esc(student ? student.name : 'Aluno removido')}
+                          </div>
+                          <div class="list-item-sub">
+                            ${fmtDate(occurrence.date)} · ${badgeFor(occurrence.type)}
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join('') || emptyState('Nenhum registro ainda.')
+              }
+            </div>
+          </section>
+        </div>
+      `;
+    } else if (tab === 'alunos') {
+      body = renderClassStudentsTab(classroom);
+    } else if (tab === 'atividades') {
+      body = `
+        <div class="row-between compact-section-head">
+          <div></div>
+          <button type="button" class="btn-primary btn-sm" id="btnNewActivityHere">
+            ${ICONS.plus} Nova atividade
+          </button>
+        </div>
+        <div class="card list-card">
+          ${
+            stats.acts.map(activity => activityListItemHTML(activity)).join('') ||
+            emptyState('Nenhuma atividade nesta disciplina.')
+          }
+        </div>
+      `;
+    } else if (tab === 'ocorrencias') {
+      const studentIds = new Set(stats.alunos.map(student => student.id));
+      const occurrences = state.occurrences
+        .filter(
+          occurrence =>
+            studentIds.has(occurrence.studentId) &&
+            (!selected || occurrence.assignmentId === selected.id),
+        )
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      body = `
+        <div class="card list-card">
+          ${
+            occurrences
+              .map(occurrence => {
+                const student = studentById(occurrence.studentId);
+                return `
+                  <div class="list-item">
+                    <div
+                      class="list-item-main"
+                      data-open-student="${esc(occurrence.studentId)}"
+                      role="button"
+                      tabindex="0"
+                    >
+                      <div class="list-item-title">
+                        ${esc(student ? student.name : 'Aluno removido')}
+                      </div>
+                      <div class="list-item-sub">
+                        ${fmtDate(occurrence.date)} · ${badgeFor(occurrence.type)}${
+                          occurrence.description
+                            ? ` · ${esc(occurrence.description)}`
+                            : ''
+                        }
+                      </div>
+                    </div>
+                  </div>
+                `;
+              })
+              .join('') || emptyState('Nenhum registro para esta disciplina.')
+          }
+        </div>
+      `;
+    } else {
+      body = `
+        <div class="card narrow-card">
+          <p class="muted">
+            Gere um relatório com os alunos acompanhados, atividades, registros e observações deste contexto.
+          </p>
+          <button type="button" class="btn-primary btn-block" id="btnGoClassReport">
+            ${ICONS.report} Gerar relatório da turma
+          </button>
+        </div>
+      `;
+    }
+
+    const school = schoolNameOf(classroom.id);
+    const meta = [
+      classroom.year ? `Ano ${classroom.year}` : '',
+      classroom.shift || '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+    return `
+      <button type="button" class="btn-ghost btn-sm page-back" id="btnBack">
+        ${ICONS.back} Voltar
+      </button>
+      <section class="card detail-hero-card class-detail-hero">
+        <div class="row-between">
+          <div>
+            <div class="list-item-title detail-title">
+              ${esc(classroom.name)}
+              ${
+                classroom.archived
+                  ? '<span class="badge badge-gray">Arquivada</span>'
+                  : ''
+              }
+            </div>
+            <div class="list-item-sub">
+              ${esc(school)}${meta ? ` · ${esc(meta)}` : ''}
+            </div>
+          </div>
+          <div class="inline-actions">
+            <button type="button" class="btn-primary btn-sm" id="btnRegisterForClass">
+              ${ICONS.plus} Registrar
+            </button>
+            ${
+              selected?.ded?.key
+                ? `
+                  <button type="button" class="btn-secondary btn-sm" id="btnUpdateClassFromDed">
+                    ${ICONS.refresh} Atualizar ${esc(selected.subject)} com DED
+                  </button>
+                `
+                : ''
+            }
+            <button type="button" class="btn-secondary btn-sm" id="btnEditThisClass">
+              ${ICONS.edit} Editar
+            </button>
+          </div>
+        </div>
+        <div class="class-assignment-switcher">
+          <div class="section-title">Disciplina</div>
+          <div class="quick-options">
+            ${
+              assignments.length
+                ? assignments
+                    .map(
+                      assignment => `
+                        <button
+                          type="button"
+                          class="quick-opt ${selected?.id === assignment.id ? 'selected' : ''}"
+                          data-class-assignment="${esc(assignment.id)}"
+                        >
+                          ${esc(assignment.subject)}
+                        </button>
+                      `,
+                    )
+                    .join('')
+                : '<span class="muted">Nenhuma disciplina definida. Você pode adicioná-la ao importar do DED+.</span>'
+            }
+          </div>
+        </div>
+      </section>
+      <div class="tabs responsive-tabs">
+        ${
+          tabs
+            .map(
+              tabItem => `
+                <button
+                  type="button"
+                  class="tab ${tab === tabItem.key ? 'active' : ''}"
+                  data-class-tab="${esc(tabItem.key)}"
+                >
+                  ${tabItem.label}
+                </button>
+              `,
+            )
+            .join('')
+        }
+      </div>
+      ${body}
+    `;
   }
 
-  return { renderTurmaDetail, renderClassStudentsTab };
+  return {
+    renderTurmaDetail,
+    renderClassStudentsTab,
+  };
 }

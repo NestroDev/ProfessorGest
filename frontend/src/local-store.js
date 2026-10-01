@@ -1,6 +1,6 @@
-import { PROF_FORMAT, CURRENT_VERSION } from './prof-model.js';
+import { PRG_FORMAT, PRG_VERSION } from './prof-model.js';
 
-export const LOCAL_DB_NAME = 'professorgest-local-v2';
+export const LOCAL_DB_NAME = 'professorgest-local-prg-v1';
 export const LOCAL_DB_VERSION = 3;
 export const LOCAL_PROJECT_STORE = 'projects';
 export const LOCAL_RECOVERY_STORE = 'recovery';
@@ -64,8 +64,28 @@ export function openLocalProjectDb() {
 
 export async function writeLocalProjectRecord(record) {
   const key = record?.state?.projectId || record?.projectId || LOCAL_PROJECT_KEY;
+  if (!record?.state || !key) return false;
+
+  // Salvamentos podem terminar fora de ordem (por exemplo, uma gravação
+  // automática e a persistência disparada por uma abertura/backup). Nunca
+  // permita que uma versão mais antiga substitua uma mais nova no IndexedDB.
+  const incomingSavedAt = Date.parse(record.savedAt || '') || 0;
+  const safeRecord = {
+    ...record,
+    savedAt: record.savedAt || new Date().toISOString(),
+    savedAtMs: incomingSavedAt || Date.now(),
+  };
+
   await withDbTransaction(LOCAL_PROJECT_STORE, 'readwrite', store => {
-    store.put(record, key);
+    const request = store.get(key);
+    request.onsuccess = () => {
+      const existing = request.result;
+      const existingSavedAt = Number(existing?.savedAtMs) || Date.parse(existing?.savedAt || '') || 0;
+      const nextSavedAt = Number(safeRecord.savedAtMs) || 0;
+      if (!existing || nextSavedAt >= existingSavedAt) {
+        store.put(safeRecord, key);
+      }
+    };
   });
   await pruneLocalProjectRecords();
   return true;
@@ -79,7 +99,7 @@ export async function readLocalProjectRecordById(projectId) {
       const tx = db.transaction(LOCAL_PROJECT_STORE, 'readonly');
       const request = tx.objectStore(LOCAL_PROJECT_STORE).get(projectId);
       request.onsuccess = () => {
-        const value = request.result?.state?.format === PROF_FORMAT && Number(request.result?.state?.version) === CURRENT_VERSION ? request.result : null;
+        const value = request.result?.state?.format === PRG_FORMAT ? request.result : null;
         try { db.close(); } catch (_) {}
         resolve(value);
       };
@@ -113,7 +133,7 @@ export async function readLocalProjectRecords(limit = MAX_LOCAL_PROJECTS) {
       const request = tx.objectStore(LOCAL_PROJECT_STORE).getAll();
       request.onsuccess = () => {
         const values = Array.isArray(request.result)
-          ? request.result.filter(v => v?.state?.format === PROF_FORMAT && Number(v?.state?.version) === CURRENT_VERSION)
+          ? request.result.filter(v => v?.state?.format === PRG_FORMAT)
           : [];
         values.sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
         try { db.close(); } catch (_) {}
@@ -155,7 +175,7 @@ async function pruneLocalProjectRecords(keep = MAX_LOCAL_PROJECTS) {
       const request = store.getAll();
       request.onsuccess = () => {
         const rows = (Array.isArray(request.result) ? request.result : [])
-          .filter(record => record?.state?.format === PROF_FORMAT && Number(record.state.version) === CURRENT_VERSION)
+          .filter(record => record?.state?.format === PRG_FORMAT && Number(record.state.version) === PRG_VERSION)
           .sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
         rows.slice(safeKeep).forEach(record => {
           const projectId = record?.state?.projectId || record?.projectId;
@@ -203,7 +223,7 @@ export async function readRecoveryRecordById(projectId) {
       const tx = db.transaction(LOCAL_RECOVERY_STORE, 'readonly');
       const request = tx.objectStore(LOCAL_RECOVERY_STORE).get(projectId);
       request.onsuccess = () => {
-        const value = request.result?.state?.format === PROF_FORMAT && Number(request.result?.state?.version) === CURRENT_VERSION ? request.result : null;
+        const value = request.result?.state?.format === PRG_FORMAT ? request.result : null;
         try { db.close(); } catch (_) {}
         resolve(value);
       };
@@ -225,7 +245,7 @@ export async function readLatestRecoveryRecord() {
       const request = tx.objectStore(LOCAL_RECOVERY_STORE).getAll();
       request.onsuccess = () => {
         const records = Array.isArray(request.result)
-          ? request.result.filter(v => v?.state?.format === PROF_FORMAT && Number(v?.state?.version) === CURRENT_VERSION)
+          ? request.result.filter(v => v?.state?.format === PRG_FORMAT)
           : [];
         records.sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
         const latest = records[0] || null;
@@ -269,7 +289,7 @@ export async function readAllProjectBackups(limit = 50) {
       const request = tx.objectStore(LOCAL_BACKUP_STORE).getAll();
       request.onsuccess = () => {
         const rows = Array.isArray(request.result)
-          ? request.result.filter(record => record?.state?.format === PROF_FORMAT && Number(record.state.version) === CURRENT_VERSION)
+          ? request.result.filter(record => record?.state?.format === PRG_FORMAT && Number(record.state.version) === PRG_VERSION)
           : [];
         rows.sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
         try { db.close(); } catch (_) {}
@@ -294,7 +314,7 @@ export async function readProjectBackups(projectId, limit = MAX_LOCAL_BACKUPS_PE
       const request = tx.objectStore(LOCAL_BACKUP_STORE).getAll();
       request.onsuccess = () => {
         const rows = Array.isArray(request.result)
-          ? request.result.filter(record => record?.state?.format === PROF_FORMAT && Number(record.state.version) === CURRENT_VERSION && record.state.projectId === projectId)
+          ? request.result.filter(record => record?.state?.format === PRG_FORMAT && Number(record.state.version) === PRG_VERSION && record.state.projectId === projectId)
           : [];
         rows.sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
         try { db.close(); } catch (_) {}

@@ -1,12 +1,12 @@
-import { PROF_MIME } from './prof-model.js';
+import { PRG_MIME } from './prof-model.js';
 
-export function normalizeProfFileName(name) {
+export function normalizePrgFileName(name) {
   let value = String(name || '').trim();
-  if (!value) return 'ProfessorGest.prof';
-  value = value.replace(/\\/g, '/').split('/').pop() || 'ProfessorGest.prof';
+  if (!value) return 'ProfessorGest.prg';
+  value = value.replace(/\\/g, '/').split('/').pop() || 'ProfessorGest.prg';
   value = value.replace(/(?:\.json)+$/i, '');
-  value = value.replace(/(?:\.prof)+$/i, '.prof');
-  if (!/\.prof$/i.test(value)) value += '.prof';
+  value = value.replace(/(?:\.prg)+$/i, '.prg');
+  if (!/\.prg$/i.test(value)) value += '.prg';
   return value;
 }
 
@@ -14,7 +14,12 @@ export function isAndroidDevice(navigatorLike = globalThis.navigator) {
   return /Android/i.test(navigatorLike?.userAgent || '');
 }
 
-export function supportsNativeFilePicker(windowLike = globalThis.window) {
+export function supportsNativeFilePicker(windowLike = globalThis.window, navigatorLike = globalThis.navigator) {
+  // Android browsers can expose showOpenFilePicker but still route provider
+  // backed documents through a FileSystemFileHandle implementation with
+  // inconsistent read support. The normal <input type=file> path is more
+  // reliable for .prg files on mobile. Keep the native picker on desktop.
+  if (isAndroidDevice(navigatorLike)) return false;
   return typeof windowLike?.showOpenFilePicker === 'function';
 }
 
@@ -23,7 +28,21 @@ export function supportsNativeSavePicker(windowLike = globalThis.window, navigat
 }
 
 export async function readTextFileUtf8(file) {
-  const buffer = await file.arrayBuffer();
+  let buffer;
+  try {
+    if (typeof file?.arrayBuffer === 'function') buffer = await file.arrayBuffer();
+  } catch (_) {}
+  if (!buffer && typeof file?.text === 'function') {
+    return String(await file.text());
+  }
+  if (!buffer) {
+    buffer = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error || new Error('Não foi possível ler o arquivo.'));
+      reader.onload = () => resolve(reader.result);
+      reader.readAsArrayBuffer(file);
+    });
+  }
   const bytes = new Uint8Array(buffer);
   if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
     return new TextDecoder('utf-16le').decode(bytes);
@@ -34,22 +53,22 @@ export async function readTextFileUtf8(file) {
   return new TextDecoder('utf-8').decode(bytes);
 }
 
-export function profOpenPickerTypes() {
+export function prgOpenPickerTypes() {
   return [{
-    description: 'ProfessorGest (.prof)',
+    description: 'ProfessorGest (.prg)',
     accept: {
-      [PROF_MIME]: ['.prof', '.prof.json'],
-      'application/json': ['.prof', '.prof.json', '.json'],
-      'application/octet-stream': ['.prof', '.prof.json'],
-      'text/plain': ['.prof', '.prof.json', '.json']
+      [PRG_MIME]: ['.prg'],
+      'application/json': ['.prg'],
+      'application/octet-stream': ['.prg'],
+      'text/plain': ['.prg']
     }
   }];
 }
 
-export function profSavePickerTypes() {
+export function prgSavePickerTypes() {
   return [{
-    description: 'ProfessorGest (.prof)',
-    accept: { [PROF_MIME]: ['.prof'] }
+    description: 'ProfessorGest (.prg)',
+    accept: { [PRG_MIME]: ['.prg'] }
   }];
 }
 
@@ -57,10 +76,10 @@ export function supportsFileShare(navigatorLike = globalThis.navigator, FileCtor
   return !!(navigatorLike?.share && typeof FileCtor !== 'undefined');
 }
 
-export async function shareFile(content, filename, mime = PROF_MIME, navigatorLike = globalThis.navigator, FileCtor = globalThis.File) {
+export async function shareFile(content, filename, mime = PRG_MIME, navigatorLike = globalThis.navigator, FileCtor = globalThis.File) {
   if (!supportsFileShare(navigatorLike, FileCtor)) return false;
   try {
-    const file = new FileCtor([content], normalizeProfFileName(filename), { type: mime });
+    const file = new FileCtor([content], normalizePrgFileName(filename), { type: mime });
     if (navigatorLike.canShare && !navigatorLike.canShare({ files: [file] })) return false;
     await navigatorLike.share({ files: [file], title: file.name });
     return true;
@@ -73,16 +92,16 @@ export async function shareFile(content, filename, mime = PROF_MIME, navigatorLi
 export function downloadTextFile(content, filename, mime, { documentLike = globalThis.document, windowLike = globalThis.window, navigatorLike = globalThis.navigator } = {}) {
   const rawContent = String(content ?? '');
   const lowerName = String(filename || '').toLowerCase();
-  const isProf = lowerName.endsWith('.prof') || lowerName.endsWith('.prof.json');
-  const safeName = isProf ? normalizeProfFileName(filename) : String(filename || 'download.txt');
-  const safeMime = mime || (isProf ? PROF_MIME : 'text/plain;charset=utf-8');
-  const androidProf = isProf && isAndroidDevice(navigatorLike);
+  const isPrg = lowerName.endsWith('.prg');
+  const safeName = isPrg ? normalizePrgFileName(filename) : String(filename || 'download.txt');
+  const safeMime = mime || (isPrg ? PRG_MIME : 'text/plain;charset=utf-8');
+  const androidPrg = isPrg && isAndroidDevice(navigatorLike);
   let objectUrl = null;
   try {
     const bytes = new TextEncoder().encode(rawContent);
     let href;
     let effectiveMime = safeMime;
-    if (androidProf && bytes.length <= 2 * 1024 * 1024) {
+    if (androidPrg && bytes.length <= 2 * 1024 * 1024) {
       href = `data:attachment/plain;charset=utf-8,${encodeURIComponent(rawContent)}`;
       effectiveMime = 'attachment/plain;charset=utf-8';
     } else {

@@ -1,6 +1,6 @@
 # Security
 
-Do not commit real Google API keys, OAuth access/refresh tokens, service-account keys, `.prof` files containing user data, or logs containing personal data.
+Do not commit real Google API keys, OAuth access/refresh tokens, service-account keys, `.prg` files containing user data, or logs containing personal data.
 
 The public `google-drive-config.js` intentionally contains no API key. The production deployment injects `PROFESSORGEST_GOOGLE_API_KEY` from GitHub Actions Secrets.
 

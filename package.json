@@ -1,7 +1,6 @@
 {
   "name": "professorgest",
   "private": true,
-  "version": "2026.09.28.2",
   "description": "ProfessorGest - aplicativo PWA local-first para organização pedagógica",
   "scripts": {
     "test": "node --test",
@@ -13,5 +12,24 @@
   "engines": {
     "node": ">=20"
   },
-  "type": "module"
+  "dependencies": {
+    "pdfjs-dist": "^5.4.54"
+  },
+  "type": "module",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NestroDev/ProfessorGest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NestroDev/ProfessorGest/issues"
+  },
+  "homepage": "https://github.com/NestroDev/ProfessorGest#readme"
 }

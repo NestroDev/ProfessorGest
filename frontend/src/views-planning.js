@@ -1,6 +1,6 @@
 export function createPlanningViewRenderer(deps) {
   const {
-    getState, getCtx, esc, fmtDate, classNameOf, emptyState, ICONS
+    getState, getCtx, esc, fmtDate, classNameOf, assignmentNameOf = () => '', emptyState, ICONS, searchFieldHTML
   } = deps;
 
   function filteredPlans() {
@@ -23,7 +23,7 @@ export function createPlanningViewRenderer(deps) {
     return `<article class="planning-card card">
       <div class="planning-card-head">
         <div>
-          <div class="planning-card-date">${fmtDate(plan.date)} · ${esc(classNameOf(plan.classId))}</div>
+          <div class="planning-card-date">${fmtDate(plan.date)} · ${esc(classNameOf(plan.classId))}${plan.assignmentId ? ` · ${esc(assignmentNameOf(plan.assignmentId))}` : ''}</div>
           <h2 class="planning-card-title">${esc(plan.title)}</h2>
         </div>
         <div class="planning-card-actions">
@@ -48,7 +48,7 @@ export function createPlanningViewRenderer(deps) {
         <div class="page-actions"><button type="button" class="btn-primary" id="btnNewPlan">${ICONS.plus} Novo planejamento</button></div>
       </div>
       <div class="filter-bar planning-filters filter-bar-clean">
-        <div class="search-bar planning-search-bar"><input class="form-input input-search" id="planningSearchInput" placeholder="Buscar planejamento..." value="${esc(ctx.planningSearch || '')}"></div>
+        ${searchFieldHTML('planningSearchInput', 'Pesquisar planejamento...', ctx.planningSearch || '')}
         <select class="form-select" id="planningClassFilterSelect">
           <option value="">Todas as turmas</option>
           ${state.classes.filter(c => !c.archived).map(c => `<option value="${esc(c.id)}" ${ctx.planningClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}

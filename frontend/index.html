@@ -64,10 +64,20 @@
         <div class="welcome-brand-sub">gestão pedagógica</div>
       </div>
     </div>
-    <button class="welcome-theme-toggle" id="welcomeThemeToggle" type="button" aria-label="Alternar tema">
-      <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span>
-      <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2z"/></svg></span>
-    </button>
+    <div class="welcome-topbar-actions">
+      <button class="welcome-account-control" id="welcomeAccountControl" type="button" aria-label="Conta do Google" title="Conta do Google">
+        <span class="welcome-account-avatar" id="welcomeAccountAvatar" aria-hidden="true">G</span>
+        <span class="welcome-account-copy" id="welcomeAccountCopy">
+          <strong id="welcomeAccountName">Google Drive</strong>
+          <span id="welcomeAccountMeta">Conectar conta</span>
+        </span>
+        <svg class="welcome-account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+      </button>
+      <button class="welcome-theme-toggle" id="welcomeThemeToggle" type="button" aria-label="Alternar tema">
+        <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span>
+        <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2z"/></svg></span>
+      </button>
+    </div>
   </header>
 
   <main class="welcome-content welcome-content-minimal">
@@ -82,7 +92,15 @@
         </span>
         <span class="welcome-card-copy">
           <strong>Abrir arquivo</strong>
-          <span>Escolher um arquivo .prof</span>
+          <span>Escolher um arquivo .prg</span>
+        </span>
+        <span class="welcome-card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="welcome-card" id="welcomeNewFromDed" type="button">
+        <span class="welcome-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3.5h9l3 3V20.5H6z"/><path d="M15 3.5v4h3M8.5 11h7M8.5 14.5h7M8.5 18h4"/></svg></span>
+        <span class="welcome-card-copy">
+          <strong>Novo arquivo pelo DED+</strong>
+          <span>Começar já com uma ou várias turmas</span>
         </span>
         <span class="welcome-card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </button>
@@ -164,16 +182,6 @@
           <label class="form-label" for="setupTeacherName">Nome do professor(a) <span class="required">*</span></label>
           <input class="form-input setup-input" id="setupTeacherName" name="teacherName" required autocomplete="name" placeholder="Ex.: Ana Souza">
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="setupSchool">Escola / instituição</label>
-            <input class="form-input setup-input" id="setupSchool" name="school" autocomplete="organization" placeholder="Ex.: Escola Municipal Aurora">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="setupSubject">Disciplina / área</label>
-            <input class="form-input setup-input" id="setupSubject" name="subject" placeholder="Ex.: Matemática">
-          </div>
-        </div>
         <div class="setup-actions">
           <button type="button" class="btn-secondary" id="setupBackBtn">Voltar</button>
           <button type="submit" class="btn-primary">Começar no ProfessorGest <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
@@ -187,8 +195,7 @@
       <div class="setup-preview-name" id="setupPreviewName">Seu nome</div>
       <div class="setup-preview-meta" id="setupPreviewMeta">Professor(a)</div>
       <div class="setup-preview-divider"></div>
-      <div class="setup-preview-row"><span>Escola</span><strong id="setupPreviewSchool">Não informado</strong></div>
-      <div class="setup-preview-row"><span>Área</span><strong id="setupPreviewSubject">Não informada</strong></div>
+      <div class="setup-preview-row"><span>Escolas e disciplinas</span><strong>Definidas nas atuações</strong></div>
     </aside>
   </main>
 </div>
@@ -212,6 +219,10 @@
   <div class="main">
     <header class="topbar">
       <div class="topbar-left">
+        <button class="topbar-home-button" id="topbarHomeBtn" type="button" aria-label="Voltar ao início" title="Voltar ao início">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M15 5 8 12l7 7"/><path d="M8 12h11"/></svg>
+          <span>Início</span>
+        </button>
         <div class="topbar-title-wrap">
           <div class="topbar-title" id="viewTitle">Início</div>
           <div class="topbar-save-status" id="topbarSaveStatus"></div>
@@ -219,11 +230,14 @@
       </div>
       <button class="topbar-search" id="topbarSearchBtn" type="button" aria-label="Busca global (Ctrl+K)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <span>Buscar no ProfessorGest...</span>
+        <span class="topbar-search-label">Pesquisar</span>
         <kbd>Ctrl K</kbd>
       </button>
       <div class="topbar-right">
-        <div class="topbar-save-action" id="topbarSaveAction"></div>
+        <button class="topbar-drive-button" id="topbarDriveBtn" type="button" aria-label="Conectar Google Drive" title="Conectar Google Drive">
+          <span class="topbar-drive-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18h10.2a4.8 4.8 0 0 0 .6-9.56A6.5 6.5 0 0 0 5.1 9.7 4.2 4.2 0 0 0 7 18z"/></svg></span>
+          <span class="topbar-drive-label">Google Drive</span>
+        </button>
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar tema" title="Alternar tema">
           <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span>
           <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2z"/></svg></span>
@@ -249,7 +263,7 @@
 <div id="cmdkRoot"></div>
 <div class="toast-root" id="toastRoot"></div>
 
-<input type="file" id="fileInput" class="visually-hidden" accept=".prof,.prof.json,.json,application/vnd.professorgest,application/json,text/plain,application/octet-stream">
+<input type="file" id="fileInput" class="visually-hidden" accept=".prg,application/vnd.professorgest.prg">
 
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="https://apis.google.com/js/api.js" async></script>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'professorgest-shell-v47';
+const CACHE_NAME = 'professorgest-shell-v64-drive-manual';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,11 +9,13 @@ const APP_SHELL = [
   './src/prof-model.js',
   './src/local-store.js',
   './src/drive-bindings.js',
+  './src/drive-account.js',
   './src/file-io.js',
   './src/drive-http.js',
   './src/project-selectors.js',
   './src/ui-navigation.js',
   './src/ui-modal.js',
+  './src/ui-search.js',
   './src/save-state.js',
   './src/views-core.js',
   './src/views-students-activities.js',
@@ -24,6 +26,10 @@ const APP_SHELL = [
   './src/views-welcome.js',
   './src/views-planning.js',
   './src/services/api-client.js',
+  './src/ded-parser.js',
+  './src/ded-pdf.js',
+  './vendor/pdfjs/pdf.mjs',
+  './vendor/pdfjs/pdf.worker.mjs',
   './google-drive-config.js',
   './logo.svg?v=21',
   './manifest.webmanifest?v=21',

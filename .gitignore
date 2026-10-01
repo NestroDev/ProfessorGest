@@ -12,8 +12,8 @@
 # =========================
 # User data / exports / logs
 # =========================
-*.prof
-*.prof.json
+*.prg
+
 professorgest-dev-log-*.json
 *.log
 

@@ -1,7 +1,7 @@
 export function createFileSettingsRenderers(deps) {
   const {
-    getState, esc, getDemoMode, getCurrentFileName, getIsDirty, ICONS,
-    supportsFileShare, driveStatusTone, driveStatusText, driveBindingForCurrentProject,
+    getState, esc, getDemoMode, getCurrentFileName, getIsDirty, ICONS, getDriveActionPending = () => false,
+    supportsFileShare, driveStatusTone, driveStatusText, driveBindingForCurrentProject, getDriveAccount = () => null,
     fmtDate, fmtDateTime, getThemeMode, getDevLogEntries, getProjectBackups = () => []
   } = deps;
 
@@ -23,18 +23,17 @@ export function createFileSettingsRenderers(deps) {
     }
     const backups = getProjectBackups();
     return `
-      <div class="page-head"><div><h1>Arquivos</h1><div class="page-sub">Abra, salve e proteja seu trabalho.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnNewFile">${ICONS.file} Novo arquivo</button><button type="button" class="btn-ghost" id="btnCloseFile">${ICONS.x} Fechar arquivo</button></div></div>
+      <div class="page-head"><div><h1>Arquivos</h1><div class="page-sub">Abra, proteja e atualize seus arquivos.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnNewFile">${ICONS.file} Novo arquivo</button></div></div>
 
       <section class="file-workspace card">
         <div class="file-workspace-head">
           <div>
             <div class="eyebrow">ARQUIVO ATUAL</div>
             <div class="file-current-name">${ICONS.file}${getCurrentFileName() ? `<strong>${esc(getCurrentFileName())}</strong>` : '<strong>Novo projeto</strong>'}</div>
-            <div class="file-current-status ${getIsDirty() ? 'dirty' : 'saved'}"><span class="status-dot"></span>${getIsDirty() ? 'Alterações não salvas' : 'Tudo salvo'}</div>
+            <div class="file-current-status ${getIsDirty() ? 'dirty' : 'saved'}"><span class="status-dot"></span>${getIsDirty() ? 'Salvando automaticamente…' : 'Salvo automaticamente neste dispositivo'}</div>
           </div>
           <div class="file-primary-actions">
             <button type="button" class="btn-secondary" id="btnOpenFile">${ICONS.folder} Abrir arquivo</button>
-            <button type="button" class="btn-primary" id="btnSaveFile">${ICONS.save} Salvar</button>
           </div>
         </div>
       </section>
@@ -47,11 +46,11 @@ export function createFileSettingsRenderers(deps) {
         </section>
 
         <section class="card file-tool-card ${driveStatusTone()}">
-          <div class="file-tool-icon">${ICONS.cloud}</div>
-          <div class="file-tool-copy"><strong>Google Drive</strong><span>${esc(driveStatusText())}</span><p>Use o mesmo projeto no computador e no celular.</p></div>
+          <div class="file-tool-icon">${getDriveAccount() ? `<div class="drive-account-icon">${getDriveAccount().photoLink ? `<img src="${esc(getDriveAccount().photoLink)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</span>` : esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</div>` : ICONS.cloud}</div>
+          <div class="file-tool-copy"><strong>Google Drive</strong><span>${esc(driveStatusText())}</span><p>${getDriveAccount() ? `Conta: ${esc(getDriveAccount().email || getDriveAccount().displayName || 'Google')}. A conta lembrada será reutilizada ao atualizar o Drive.` : 'Conecte sua conta para poder atualizar o Drive quando decidir.'}</p></div>
           <div class="file-tool-actions">
             <button type="button" class="btn-secondary" id="btnDriveOpen">${ICONS.folder} Abrir do Drive</button>
-            <button type="button" class="btn-primary" id="btnDriveAction">${driveBindingForCurrentProject() ? ICONS.cloud + ' Sincronizar agora' : ICONS.save + ' Salvar no Drive'}</button>
+            <button type="button" class="btn-primary" id="btnDriveAction" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Atualizando…' : (driveBindingForCurrentProject() ? ICONS.cloud + ' Atualizar Drive' : ICONS.cloud + ' Conectar e atualizar')}</button>
             ${driveBindingForCurrentProject() ? '<button type="button" class="btn-ghost" id="btnDriveDisconnect">Desvincular</button>' : ''}
           </div>
         </section>
@@ -60,12 +59,12 @@ export function createFileSettingsRenderers(deps) {
       <details class="file-more-options">
         <summary><span>Mais opções do arquivo</span><span class="details-hint">Exportar, compartilhar e importar</span></summary>
         <div class="file-more-grid">
-          <button type="button" class="btn-secondary" id="btnExportProf">${ICONS.file} Exportar cópia .prof</button>
-          <button type="button" class="btn-secondary" id="btnShareProf" ${supportsFileShare() ? '' : 'hidden'}>${ICONS.share || ICONS.copy} Compartilhar .prof</button>
+          <button type="button" class="btn-secondary" id="btnExportPrg">${ICONS.file} Exportar cópia .prg</button>
+          <button type="button" class="btn-secondary" id="btnSharePrg" ${supportsFileShare() ? '' : 'hidden'}>${ICONS.share || ICONS.copy} Compartilhar .prg</button>
           <button type="button" class="btn-secondary" id="btnExportCsv">${ICONS.copy} Exportar alunos (CSV)</button>
           <button type="button" class="btn-secondary" id="btnImportCsv">${ICONS.folder} Importar alunos (CSV)</button>
         </div>
-        <p class="file-note">Em alguns celulares, o arquivo aberto não pode ser atualizado diretamente. Nesses casos, suas alterações continuam protegidas neste dispositivo; use <strong>Exportar cópia .prof</strong> para gerar o arquivo atualizado.</p>
+        <p class="file-note">Em alguns celulares, o arquivo aberto não pode ser atualizado diretamente. Nesses casos, suas alterações continuam protegidas neste dispositivo; use <strong>Exportar cópia .prg</strong> para gerar o arquivo atualizado.</p>
       </details>
 
       <p class="file-meta-line">Criado em ${fmtDate(getState().createdAt)} · Última alteração: ${fmtDateTime(getState().updatedAt)}</p>
@@ -84,24 +83,20 @@ export function createFileSettingsRenderers(deps) {
         <section class="card">
           <div class="section-title section-title-first">Perfil do professor</div>
           <p class="form-hint settings-hint-md">Estas informações ajudam a personalizar o dashboard e os relatórios.</p>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Nome do professor(a)</label>
-              <input class="form-input" id="teacherNameInput" value="${esc((getState().teacher && getState().teacher.name) || '')}" placeholder="Ex.: Prof. João"></div>
-            <div class="form-group"><label class="form-label">Disciplina / área</label>
-              <input class="form-input" id="teacherSubjectInput" value="${esc((getState().teacher && getState().teacher.subject) || '')}" placeholder="Ex.: Matemática"></div>
-          </div>
-          <div class="form-group"><label class="form-label">Escola / instituição</label>
-            <input class="form-input" id="teacherSchoolInput" value="${esc((getState().teacher && getState().teacher.school) || '')}" placeholder="Ex.: Escola Municipal Aurora"></div>
-          <button type="button" class="btn-primary btn-sm" id="btnSaveTeacherName">Salvar alterações</button>
+          <div class="form-group"><label class="form-label">Nome do professor(a)</label>
+            <input class="form-input" id="teacherNameInput" value="${esc((getState().teacher && getState().teacher.name) || '')}" placeholder="Ex.: João da Silva"></div>
+          <p class="form-hint">Escola e disciplina não ficam no perfil. Elas pertencem às suas atuações e podem variar entre turmas.</p>
+          <button type="button" class="btn-primary btn-sm" id="btnSaveTeacherName">Salvar nome</button>
         </section>
 
         <section class="card">
           <div class="section-title section-title-first">Arquivos e sincronização</div>
-          <p class="form-hint settings-hint">Abra, salve, faça cópias de segurança e gerencie o Google Drive em um único lugar.</p>
+          <p class="form-hint settings-hint">Abra projetos, acompanhe o salvamento automático, faça cópias de segurança e gerencie o Google Drive em um único lugar.</p>
           <div class="drive-settings-status ${driveStatusTone()}">
-            <span class="drive-settings-icon">${ICONS.cloud}</span>
-            <div><strong>${esc(driveStatusText())}</strong><span>${driveBindingForCurrentProject() ? `Projeto: ${esc(driveBindingForCurrentProject().name || getCurrentFileName() || 'Projeto atual')}` : 'Google Drive opcional.'}</span></div>
+            ${getDriveAccount() ? `<div class="drive-settings-photo">${getDriveAccount().photoLink ? `<img src="${esc(getDriveAccount().photoLink)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</span>` : esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</div>` : `<span class="drive-settings-icon">${ICONS.cloud}</span>`}
+            <div><strong>${esc(driveStatusText())}</strong><span>${getDriveAccount() ? `${esc(getDriveAccount().displayName || 'Conta Google')} · ${esc(getDriveAccount().email || 'Conta conectada')}` : (driveBindingForCurrentProject() ? `Projeto: ${esc(driveBindingForCurrentProject().name || getCurrentFileName() || 'Projeto atual')}` : 'Google Drive opcional.')}</span></div>
           </div>
+          ${getDriveAccount() ? `<div class="drive-account-settings-row"><span>Conta lembrada neste dispositivo</span><button type="button" class="btn-secondary btn-sm" id="btnDriveAccountSettings">Gerenciar conta</button></div>` : ''}
           <div class="form-actions form-actions-settings">
             <button type="button" class="btn-primary" id="btnGoFileFromSettings">${ICONS.folder} Abrir Arquivos</button>
           </div>

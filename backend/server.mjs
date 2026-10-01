@@ -51,7 +51,7 @@ const server = createServer((req, res) => {
       version: '1.0.0',
       apiVersion: 'v1',
       mode: 'stateless',
-      storage: 'client-owned .prof files',
+      storage: 'client-owned .prg files',
     });
     return;
   }

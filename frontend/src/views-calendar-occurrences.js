@@ -1,8 +1,8 @@
 export function createCalendarOccurrenceRenderers(deps) {
   const {
-    getState, getCtx, esc, classNameOf, studentById, studentsOf, initials,
+    getState, getCtx, esc, classNameOf, assignmentNameOf = () => '', studentById, studentsOf, initials,
     activityStatus, todayISO, fmtDate, monthLabel, weekdayShort, pad2,
-    emptyState, badgeFor, ICONS, occurrenceTypes
+    emptyState, badgeFor, ICONS, occurrenceTypes, searchFieldHTML
   } = deps;
 
   function activitiesInMonth(ym) {
@@ -58,35 +58,47 @@ export function createCalendarOccurrenceRenderers(deps) {
         </div>
       </div>
       ${selDay ? `<div class="section-title">Planejamento em ${fmtDate(selDay)}</div>
-        <div class="card list-card">${selPlans.map(plan => `<div class="list-item"><div class="list-item-fill"><div class="list-item-title">${esc(plan.title)}</div><div class="list-item-sub">${esc(classNameOf(plan.classId))}</div></div><button type="button" class="btn-secondary btn-sm" data-edit-plan="${esc(plan.id)}">${ICONS.edit} Editar</button></div>`).join('') || emptyState('Nenhum planejamento neste dia.')}</div>
+        <div class="card list-card">${selPlans.map(plan => `<div class="list-item"><div class="list-item-fill"><div class="list-item-title">${esc(plan.title)}</div><div class="list-item-sub">${esc(classNameOf(plan.classId))}${plan.assignmentId ? ` · ${esc(assignmentNameOf(plan.assignmentId))}` : ''}</div></div><button type="button" class="btn-secondary btn-sm" data-edit-plan="${esc(plan.id)}">${ICONS.edit} Editar</button></div>`).join('') || emptyState('Nenhum planejamento neste dia.')}</div>
         <div class="section-title">Atividades em ${fmtDate(selDay)}</div>
         <div class="card list-card">${selActs.map(a => `<div class="list-item"><div class="list-item-main" data-open-activity="${esc(a.id)}" role="button" tabindex="0">
-          <div class="list-item-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))}</div></div></div>`).join('') || emptyState('Nenhuma atividade neste dia.')}</div>` : ''}
+          <div class="list-item-title">${esc(a.name)}</div><div class="list-item-sub">${esc(classNameOf(a.classId))}${a.assignmentId ? ` · ${esc(assignmentNameOf(a.assignmentId))}` : ''}</div></div></div>`).join('') || emptyState('Nenhuma atividade neste dia.')}</div>` : ''}
     `;
   }
 
   function renderOcorrenciasLog() {
+    const ctx = getCtx();
     let list = [...getState().occurrences];
-    if (getCtx().occClassFilter) { const ids = new Set(studentsOf(getCtx().occClassFilter).map(s => s.id)); list = list.filter(o => ids.has(o.studentId)); }
-    if (getCtx().occTypeFilter) list = list.filter(o => o.type === getCtx().occTypeFilter);
-    if (getCtx().occMonth) list = list.filter(o => o.date.slice(0, 7) === getCtx().occMonth);
+    if (ctx.occClassFilter) { const ids = new Set(studentsOf(ctx.occClassFilter).map(s => s.id)); list = list.filter(o => ids.has(o.studentId)); }
+    if (ctx.occTypeFilter) list = list.filter(o => o.type === ctx.occTypeFilter);
+    if (ctx.occMonth) list = list.filter(o => o.date.slice(0, 7) === ctx.occMonth);
+    const term = String(ctx.occSearch || '').trim().toLocaleLowerCase('pt-BR');
+    if (term) {
+      list = list.filter(o => {
+        const s = studentById(o.studentId);
+        const typeLabel = occurrenceTypes.find(t => t.key === o.type)?.label || o.type || '';
+        const hay = [s?.name, classNameOf(s?.classId), assignmentNameOf(o.assignmentId), o.description, typeLabel, o.date]
+          .filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+        return hay.includes(term);
+      });
+    }
     list.sort((a, b) => b.date.localeCompare(a.date));
 
     return `
-      <div class="page-head"><div><h1>Ocorrências</h1><div class="page-sub">${list.length} registro(s)</div></div>
+      <div class="page-head"><div><h1>Ocorrências</h1><div class="page-sub">${list.length} ${list.length === 1 ? 'registro' : 'registros'}</div></div>
         <div class="page-actions"><button type="button" class="btn-primary" id="btnQuickRegisterOcc">${ICONS.plus} Registrar</button></div>
       </div>
-      <div class="filter-bar">
-        <select class="form-select" id="occClassFilterSelect"><option value="">Todas as turmas</option>
-          ${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().occClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
-        <select class="form-select" id="occTypeFilterSelect"><option value="">Todos os tipos</option>
-          ${occurrenceTypes.map(t => `<option value="${esc(t.key)}" ${getCtx().occTypeFilter === t.key ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
+      <div class="filter-bar filter-bar-clean">
+        ${searchFieldHTML('occSearchInput', 'Pesquisar aluno ou registro...', ctx.occSearch || '')}
+        <select class="form-select filter-select" id="occClassFilterSelect"><option value="">Todas as turmas</option>
+          ${getState().classes.map(c => `<option value="${esc(c.id)}" ${ctx.occClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+        <select class="form-select filter-select" id="occTypeFilterSelect"><option value="">Todos os tipos</option>
+          ${occurrenceTypes.map(t => `<option value="${esc(t.key)}" ${ctx.occTypeFilter === t.key ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
       </div>
       <div class="card list-card">${list.map(o => { const s = studentById(o.studentId); return `<div class="list-item">
         <div class="list-item-main" data-open-student="${esc(o.studentId)}">
           <div class="avatar sm">${s ? initials(s.name) : '—'}</div>
           <div><div class="list-item-title">${esc(s ? s.name : 'Aluno removido')}</div>
-          <div class="list-item-sub">${fmtDate(o.date)} · ${esc(classNameOf(s ? s.classId : null))} · ${badgeFor(o.type)} ${o.description ? '· ' + esc(o.description) : ''}</div></div>
+          <div class="list-item-sub">${fmtDate(o.date)} · ${esc(classNameOf(s ? s.classId : null))}${o.assignmentId ? ` · ${esc(assignmentNameOf(o.assignmentId))}` : ''} · ${badgeFor(o.type)} ${o.description ? '· ' + esc(o.description) : ''}</div></div>
         </div>
         <div class="list-item-actions"><button type="button" class="btn-icon" data-edit-occ="${esc(o.id)}" aria-label="Editar">${ICONS.edit}</button>
         <button type="button" class="btn-icon danger" data-del-occ="${esc(o.id)}" aria-label="Excluir">${ICONS.trash}</button></div></div>`; }).join('') || emptyState('Nenhuma ocorrência encontrada para este filtro.')}</div>

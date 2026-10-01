@@ -1,8 +1,8 @@
 const ROUTE_KEY = 'professorgest-navigation-v2';
 const ROUTE_CTX_KEYS = [
-  'classId', 'studentId', 'activityId', 'classTab', 'studentTab', 'histFilter', 'histMonth',
+  'classId', 'assignmentId', 'studentId', 'activityId', 'classTab', 'studentTab', 'histFilter', 'histMonth',
   'studentSearch', 'studentClassFilter', 'studentSort', 'activityFilter', 'activityClassFilter',
-  'occClassFilter', 'occTypeFilter', 'occMonth', 'calMonth', 'calSelectedDay', 'calClassFilter',
+  'occSearch', 'occClassFilter', 'occTypeFilter', 'occMonth', 'calMonth', 'calSelectedDay', 'calClassFilter',
   'reportStudentId', 'reportFrom', 'reportTo', 'reportOpts', 'reportSynthesis', 'classReportId',
   'classReportFrom', 'classReportTo', 'classSearch', 'activitySearch', 'planningSearch',
   'planningClassFilter', 'planningFrom', 'planningTo', 'showArchivedClasses'
@@ -129,7 +129,8 @@ export function createNavigationController({
       relatorios: 'Gerar e revisar relatórios',
       arquivo: 'Abrir, salvar, exportar e proteger seus arquivos',
       planejamento: 'Preparar aulas e registrar conteúdos',
-      configuracoes: 'Perfil, aparência e suporte'
+      configuracoes: 'Perfil, aparência e suporte',
+      escolas: 'Organizar escolas e atuações'
     };
     return map[key] || '';
   }
@@ -213,7 +214,7 @@ export function createNavigationController({
       .map(key => navItems.find(item => item.key === key))
       .filter(Boolean);
     const activeView = {
-      turmaDetail: 'turmas', alunoDetail: 'alunos', atividadeDetail: 'atividades',
+      turmaDetail: 'turmas', alunoDetail: 'alunos', atividadeDetail: 'atividades', escolaDetail: 'escolas',
       relatorio: 'relatorios', classReport: 'relatorios',
     }[getCurrentView()] || getCurrentView();
     root.dataset.context = config.key;
@@ -243,13 +244,14 @@ export function createNavigationController({
     if (trigger) trigger.setAttribute('aria-expanded', 'true');
     const state = getState();
     const teacherName = state?.teacher?.name?.trim() || 'Professor(a)';
-    const school = state?.teacher?.school?.trim() || '';
+    const school = '';
     const driveConnected = !!driveBindingForCurrentProject();
     const driveLabel = driveConnected ? 'Google Drive conectado' : 'Google Drive disponível';
     const mobileGroups = [
       { label: 'Aulas', keys: ['planejamento', 'calendario', 'atividades'] },
       { label: 'Acompanhamento', keys: ['ocorrencias', 'relatorios'] },
-      { label: 'Meu espaço', keys: ['turmas', 'arquivo', 'configuracoes'] },
+      { label: 'Organização', keys: ['turmas', 'alunos', 'escolas'] },
+      { label: 'Sistema', keys: ['arquivo', 'configuracoes'] },
     ];
     const menuItems = mobileGroups.map(group => {
       const items = group.keys.map(key => navItems.find(item => item.key === key)).filter(Boolean).map(mobileMenuButton).join('');
