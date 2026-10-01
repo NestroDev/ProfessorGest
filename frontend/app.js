@@ -2802,10 +2802,6 @@ function bindGlobalEvents() {
     else connectGoogleDriveAccount();
   });
   document.getElementById('welcomeDemo').onclick = () => beginDemoMode();
-  document.getElementById('welcomeDrive')?.addEventListener('click', () => {
-    if (driveAccount) openDriveAccountSettings();
-    else connectGoogleDriveAccount();
-  });
   document.getElementById('welcomeBackups')?.addEventListener('click', () => openBackupsModal({ global: true }));
   document.getElementById('welcomeSettings')?.addEventListener('click', () => openWelcomeSettingsModal());
   document.getElementById('welcomeInstall')?.addEventListener('click', promptInstall);

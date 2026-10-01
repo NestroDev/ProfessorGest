@@ -1111,13 +1111,11 @@ body:not(.workspace-active) #app { display: none; }
 .welcome-secondary-icon svg { width: 15px; height: 15px; stroke-linecap: round; stroke-linejoin: round; }
 .welcome-secondary-action:hover .welcome-secondary-icon { transform: scale(1.08); box-shadow: 0 4px 10px color-mix(in srgb, currentColor 14%, transparent); }
 #welcomeDemo .welcome-secondary-icon { color: #8A5A11; background: #FFF4D9; }
-#welcomeDrive .welcome-secondary-icon { color: #23815C; background: #E8F7EF; }
 #welcomeBackups .welcome-secondary-icon { color: #7A5BC1; background: #F1ECFF; }
 #welcomeSettings .welcome-secondary-icon { color: var(--primary); background: var(--primary-soft); }
 #welcomeInstall .welcome-secondary-icon { color: #147A5D; background: var(--success-soft); }
 
 html[data-theme="dark"] #welcomeDemo .welcome-secondary-icon { color: #E5B94D; background: #352A15; }
-html[data-theme="dark"] #welcomeDrive .welcome-secondary-icon { color: #62D4A9; background: #173229; }
 html[data-theme="dark"] #welcomeBackups .welcome-secondary-icon { color: #BDA5F5; background: #2C2340; }
 .welcome-legal { margin-top: 18px; color: var(--text-muted); font-size: 10px; line-height: 1.5; text-align: center; }
 .welcome-legal-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
