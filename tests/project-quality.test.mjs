@@ -14,34 +14,9 @@ import {
   validateAndParsePrg,
 } from '../frontend/src/prof-model.js';
 import {
-  LOCAL_RECOVERY_STORE,
-  LOCAL_BACKUP_STORE,
-  LOCAL_DB_NAME,
-  LOCAL_DB_VERSION,
-  MAX_LOCAL_PROJECTS,
-  writeRecoveryRecord,
-  writeProjectBackup,
-  readProjectBackups,
-  readLatestRecoveryRecord,
-  readLocalProjectRecordById,
-  deleteLocalProjectRecord,
-  clearLocalProjectRecords,
-  readRecoveryRecordById,
-  clearProjectBackups,
-  clearAllLocalData,
-} from '../frontend/src/local-store.js';
-import {
   isAndroidDevice,
-  supportsNativeFilePicker,
   readTextFileUtf8,
 } from '../frontend/src/file-io.js';
-import {
-  DRIVE_BINDINGS_KEY,
-  readDriveBindings,
-  setDriveBinding,
-  getDriveBinding,
-  removeDriveBinding,
-} from '../frontend/src/drive-bindings.js';
 import {
   DRIVE_ACCOUNT_KEY,
   normalizeDriveAccount,
@@ -54,12 +29,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 
 
-test('Android usa o seletor de arquivo compatível em vez do File System Access Picker', () => {
-  assert.equal(isAndroidDevice({ userAgent: 'Mozilla/5.0 (Linux; Android 14) Chrome/154 Mobile' }), true);
-  assert.equal(supportsNativeFilePicker({ showOpenFilePicker: () => {} }, { userAgent: 'Mozilla/5.0 (Linux; Android 14) Chrome/154 Mobile' }), false);
-  assert.equal(supportsNativeFilePicker({ showOpenFilePicker: () => {} }, { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/154' }), true);
-});
-
 test('local frontend contains the PDF.js runtime used by the DED importer', () => {
   const pdfjs = path.join(root, 'frontend', 'vendor', 'pdfjs');
   assert.ok(fs.existsSync(path.join(pdfjs, 'pdf.mjs')));
@@ -71,8 +40,6 @@ const coreViewSource = fs.readFileSync(path.join(root, 'frontend', 'src', 'views
 const cssSource = fs.readFileSync(path.join(root, 'frontend', 'style.css'), 'utf8');
 const swSource = fs.readFileSync(path.join(root, 'frontend', 'sw.js'), 'utf8');
 const htmlSource = fs.readFileSync(path.join(root, 'frontend', 'index.html'), 'utf8');
-const welcomeViewSource = fs.readFileSync(path.join(root, 'frontend', 'src', 'views-welcome.js'), 'utf8');
-const localStoreSource = fs.readFileSync(path.join(root, 'frontend', 'src', 'local-store.js'), 'utf8');
 
 function validProject(overrides = {}) {
   return {
@@ -179,19 +146,6 @@ test('limite de tamanho do .prg é aplicado', () => {
   assert.equal(result.error, 'size');
 });
 
-test('tela inicial separa criar/abrir em escolhas e login Google não abre o Picker', () => {
-  assert.doesNotMatch(indexSource, /id=\"welcomeNewFromDed\"/);
-  assert.match(indexSource, /id=\"welcomeNewFile\"/);
-  assert.match(indexSource, /id=\"welcomeOpenFile\"/);
-  assert.match(appSource, /function openWelcomeNewFileChooser\(\)/);
-  assert.match(appSource, /function openWelcomeFileChooser\(\)/);
-  assert.match(appSource, /function connectGoogleDriveAccount\(\)/);
-  assert.match(appSource, /else connectGoogleDriveAccount\(\)/);
-  assert.doesNotMatch(appSource, /if \(!driveAccount\) \{ openDrivePicker\(\); return; \}/);
-  assert.match(appSource, /welcomeChoiceDed/);
-  assert.match(appSource, /welcomeChoiceDriveFile/);
-});
-
 test('conta Google lembrada persiste apenas identidade e normaliza os dados', () => {
   assert.equal(DRIVE_ACCOUNT_KEY, 'professorgest-drive-account-v1');
   const storage = { data: new Map(), getItem(key) { return this.data.get(key) ?? null; }, setItem(key, value) { this.data.set(key, value); }, removeItem(key) { this.data.delete(key); } };
@@ -203,60 +157,6 @@ test('conta Google lembrada persiste apenas identidade e normaliza os dados', ()
   assert.equal(readDriveAccount(storage).account, null);
   assert.equal(normalizeDriveAccount({ displayName: 'Sem identidade' }), null);
   assert.doesNotMatch(JSON.stringify(account), /access_token/i);
-});
-
-test('vínculo do Drive é indexado por projectId e não pelo nome', () => {
-  assert.equal(DRIVE_BINDINGS_KEY, 'professorgest-drive-bindings-v3');
-  const first = setDriveBinding({}, { fileId: 'file-a', name: 'A.prg' }, 'project-a');
-  const second = setDriveBinding(first.bindings, { fileId: 'file-b', name: 'A.prg' }, 'project-b');
-  assert.equal(getDriveBinding(second.bindings, 'project-a')?.fileId, 'file-a');
-  assert.equal(getDriveBinding(second.bindings, 'project-b')?.fileId, 'file-b');
-  assert.equal(getDriveBinding(second.bindings, 'project-a')?.projectId, 'project-a');
-  assert.equal(removeDriveBinding(second.bindings, 'project-a')['project-a'], undefined);
-  assert.match(appSource, /getDriveBinding\(driveBindingsByProject, state\.projectId\)/);
-  assert.doesNotMatch(appSource, /legacyDriveBinding/);
-  assert.match(appSource, /login_hint: driveAccount\.email/);
-  assert.match(appSource, /prompt: chooseAccount \? 'select_account'/);
-  assert.match(appSource, /about\?fields=user\(displayName,emailAddress,photoLink,permissionId\)/);
-  assert.match(appSource, /drive-account\.js/);
-});
-
-test('camada de armazenamento local está modularizada e usa IndexedDB', () => {
-  assert.equal(LOCAL_RECOVERY_STORE, 'recovery');
-  assert.equal(LOCAL_BACKUP_STORE, 'backups');
-  assert.equal(LOCAL_DB_NAME, 'professorgest-local-prg-v1');
-  assert.equal(LOCAL_DB_VERSION, 3);
-  assert.equal(MAX_LOCAL_PROJECTS, 4);
-  assert.equal(typeof writeRecoveryRecord, 'function');
-  assert.equal(typeof readLatestRecoveryRecord, 'function');
-  assert.equal(typeof readLocalProjectRecordById, 'function');
-  assert.equal(typeof readRecoveryRecordById, 'function');
-  assert.equal(typeof writeProjectBackup, 'function');
-  assert.equal(typeof deleteLocalProjectRecord, 'function');
-  assert.equal(typeof clearProjectBackups, 'function');
-  assert.equal(typeof clearAllLocalData, 'function');
-  assert.equal(typeof clearLocalProjectRecords, 'function');
-  assert.equal(typeof readProjectBackups, 'function');
-  assert.match(appSource, /from '\.\/src\/local-store\.js'/);
-});
-
-test('versões locais são tratadas como cache limitado e podem ser limpas sem apagar o .prg', () => {
-  assert.match(localStoreSource, /MAX_LOCAL_PROJECTS = 4/);
-  assert.match(localStoreSource, /await pruneLocalProjectRecords\(\)/);
-  assert.match(localStoreSource, /rows\.slice\(safeKeep\)/);
-  assert.match(localStoreSource, /export async function clearLocalProjectRecords\(\)/);
-  assert.match(appSource, /As versões locais foram removidas/);
-  assert.match(appSource, /Seus arquivos \.prg não foram alterados/);
-  assert.match(appSource, /Limite local: 4 projetos/);
-});
-
-test('políticas legais descrevem o comportamento manual atual do Google Drive', () => {
-  const privacySource = fs.readFileSync(path.join(root, 'frontend', 'privacidade.html'), 'utf8');
-  const termsSource = fs.readFileSync(path.join(root, 'frontend', 'termos.html'), 'utf8');
-  assert.doesNotMatch(privacySource, /sincronização automática/i);
-  assert.match(privacySource, /não envia essas alterações ao Drive automaticamente/i);
-  assert.match(termsSource, /As atualizações de um projeto já vinculado ao Drive são manuais/i);
-  assert.match(termsSource, /não realiza atualizações automáticas em segundo plano/i);
 });
 
 test('CSS possui apenas um tema claro canônico e um dark canônico', () => {
@@ -280,34 +180,32 @@ test('planejamento é opcional e compatível com projetos atuais', () => {
 test('recursos novos estão conectados ao aplicativo', () => {
   assert.match(appSource, /createPlanningViewRenderer/);
   assert.match(appSource, /openMoveStudentModal/);
-  assert.match(appSource, /writeProjectBackup/);
+  assert.match(appSource, /projectStore\.createBackup/);
   assert.match(appSource, /classSearchInput/);
   assert.match(appSource, /activitySearchInput/);
   assert.match(cssSource, /planning-card/);
 });
-
-test('fluxo do DED na tela inicial preserva o modo de criação de novo projeto até a confirmação', () => {
-  assert.match(appSource, /openDedImportModal\(\{ newProject: true \}\)/);
-  assert.match(appSource, /addEventListener\('change', event => handleDedImportInput\(event, \{ newProject \}\), \{ once: true \}\)/);
+test('fluxo do DED preserva o modo de criação de novo projeto até a confirmação', () => {
+  assert.match(appSource, /openDedImportModal\(\{ newProject: true \}\)|openDedPicker\(\{ newProject: true \}\)/);
+  assert.match(appSource, /handleDedImportInput\(event, \{ newProject \}\), \{ once: true \}/);
   assert.match(appSource, /openDedImportReview\(parsed\.results, parsed\.errors, \{ newProject \}\)/);
-  assert.match(appSource, /onClick\('#btnConfirmDedImport', \(\) => newProject \? commitDedNewProject\(unique\) : commitDedImport\(unique\)\)/);
+  assert.match(appSource, /commitDedProject\(results, \{ newProject \}\)/);
 });
-
 test('resumo da atualização do DED mantém espaço e pluralização entre quantidade e descrição', () => {
-  assert.match(appSource, /class=\"ded-update-summary-item\"><strong>\$\{diff\.added\.length\}<\/strong><span>/);
-  assert.match(appSource, /diff\.added\.length === 1 \? 'novo' : 'novos'/);
-  assert.match(appSource, /diff\.renamed\.length === 1 \? 'nome alterado' : 'nomes alterados'/);
-  assert.match(appSource, /diff\.missing\.length === 1 \? 'não encontrado no PDF' : 'não encontrados no PDF'/);
+  assert.match(appSource, /class="ded-update-summary-item"><strong>\$\{summary\.newStudents\}<\/strong><span>/);
+  assert.match(appSource, /summary\.newStudents === 1 \? 'aluno novo' : 'alunos novos'/);
+  assert.match(appSource, /summary\.renamedStudents === 1 \? 'nome alterado' : 'nomes alterados'/);
+  assert.match(appSource, /summary\.preservedMissing === 1 \? 'ausente preservado' : 'ausentes preservados'/);
   assert.match(cssSource, /\.ded-update-summary-item\{[^}]*gap:7px/);
 });
-
 test('importação do DED usa identidade estável de escola + turma + ano e preenche perfil quando faltante', () => {
-  assert.match(appSource, /sameDedClassIdentity\(c, data\)/);
-  assert.match(appSource, /profile\.teacher\.name/);
-  assert.match(appSource, /ensureSchoolFromDed\(data\)/);
-  assert.match(appSource, /assignmentForDedImport\(data, cls\)/);
+  const src = fs.readFileSync(path.join(root, 'frontend', 'src', 'ded-project.js'), 'utf8');
+  assert.match(src, /sameDedClassIdentity\(c, data\)/);
+  assert.match(src, /profile\.teacher\.name/);
+  assert.match(src, /ensureSchool\(state, data, uid\)/);
+  assert.match(src, /ensureAssignment\(state, data, cls, now, uid\)/);
+  assert.match(appSource, /from '\.\/src\/ded-project\.js'/);
 });
-
 test('PDF é carregado sob demanda', () => {
   assert.doesNotMatch(htmlSource, /html2canvas\/1\.4\.1\/html2canvas\.min\.js/);
   assert.doesNotMatch(htmlSource, /jspdf\/2\.5\.1\/jspdf\.umd\.min\.js/);
@@ -327,101 +225,14 @@ test('overlays de erro ficam fora do app para funcionar na tela inicial', () => 
   assert.ok(toastIndex > overlaysStart);
 });
 
-test('limpeza de cópias possui ação real e invalida o cache local', () => {
-  assert.match(appSource, /id=\"btnClearBackupsModal\"/);
-  assert.match(appSource, /clearProjectBackups\(global \? null : state\?\.projectId/);
-  assert.match(appSource, /projectBackupsCache = \[\];/);
-});
-
-test('limpar todos os dados também redefine o estado em memória e os vínculos locais', () => {
-  assert.match(appSource, /function resetInMemoryAfterLocalDataClear\(\)/);
-  assert.match(appSource, /driveAccessToken = null/);
-  assert.match(appSource, /driveBindingsByProject = \{\}/);
-  assert.match(appSource, /localStorage\.removeItem\('professorgest-theme'\)/);
-  assert.match(appSource, /await showWelcomeScreen\(\)/);
-  assert.match(localStoreSource, /const stores = \[LOCAL_PROJECT_STORE, LOCAL_RECOVERY_STORE, LOCAL_META_STORE, LOCAL_BACKUP_STORE\]/);
-});
-
-test('tela inicial expõe a conta Google lembrada sem competir com as ações principais', () => {
-  assert.match(indexSource, /id="welcomeAccountControl"/);
-  assert.match(indexSource, /id="welcomeAccountAvatar"/);
-  assert.match(indexSource, /id="welcomeAccountName"/);
-  assert.match(appSource, /function updateWelcomeAccountControl\(\)/);
-  assert.match(appSource, /welcomeAccountControl/);
-  assert.match(appSource, /Gerenciar conta Google/);
-  assert.match(cssSource, /\.welcome-account-control/);
-  assert.match(cssSource, /\.welcome-account-avatar/);
-});
-
-test('controles de dados locais e configurações estão disponíveis também na tela inicial', () => {
-  assert.match(htmlSource, /id="welcomeSettings"/);
-  assert.match(htmlSource, /id="welcomeBackups"/);
-  assert.match(appSource, /function openWelcomeSettingsModal\(\)/);
-  assert.match(appSource, /function openLocalDataManager\(\)/);
-  assert.match(appSource, /id="btnClearAllLocalData"/);
-  assert.match(appSource, /id="btnClearAllBackups"/);
-  assert.match(appSource, /id="btnClearAllLocalProjects"/);
-  assert.match(appSource, /clearAllLocalProjectVersions\(\)/);
-  assert.match(appSource, /clearAllLocalData\(\)/);
-});
-
-test('erros ao abrir arquivo são exibidos depois do loading, não escondidos pelo splash', () => {
-  const openStart = appSource.indexOf('async function openFile');
-  const inputStart = appSource.indexOf('async function handleFileOpenInput');
-  assert.ok(openStart >= 0 && inputStart > openStart);
-  const openBlock = appSource.slice(openStart, inputStart);
-  const inputBlock = appSource.slice(inputStart);
-
-  for (const block of [openBlock, inputBlock]) {
-    const loadingIndex = block.indexOf("await withAppLoading('Abrindo seu arquivo...'");
-    const errorIndex = block.indexOf('if (openError) showFileErrorModal(openError.message');
-    assert.ok(loadingIndex >= 0);
-    assert.ok(errorIndex > loadingIndex);
-    const callbackScoped = block.slice(loadingIndex, errorIndex);
-    assert.doesNotMatch(callbackScoped, /showFileErrorModal\(/);
-  }
-});
-
-test('salvamento automático persiste alterações locais e grava arquivo .prg quando já autorizado', () => {
-  assert.match(appSource, /function scheduleAutomaticSave\(\)/);
-  assert.match(appSource, /async function performAutomaticSave\(\)/);
-  assert.match(appSource, /scheduleAutomaticSave\(\);/);
-  assert.match(appSource, /writeCurrentFileHandleAutomatically\(payload(?:,\s*\{[\s\S]*?\})?\)/);
-  assert.match(appSource, /saveLocalProjectSnapshot\(\{[\s\S]*stateData: payload/);
-  assert.match(appSource, /visibilitychange/);
-  assert.match(appSource, /pagehide/);
-});
-
-test('salvamento local não persiste handle físico antes da gravação ser confirmada', () => {
-  const autoSaveStart = appSource.indexOf('async function performAutomaticSave');
-  const chromeStart = appSource.indexOf('function clearDirty', autoSaveStart);
-  const block = appSource.slice(autoSaveStart, chromeStart);
-  assert.match(block, /persistFileHandle: false/);
-  assert.match(block, /physicalFileSaved = await writeCurrentFileHandleAutomatically\(payload(?:,\s*\{[\s\S]*?\})?\)/);
-  assert.match(block, /persistFileHandle: true/);
-});
-
-test('recuperação local detecta alteração externa do .prg antes de reabrir o handle', () => {
-  const restoreStart = appSource.indexOf('async function restorePersistedProjectById');
-  const restoreEnd = appSource.indexOf('async function restorePersistedProject()', restoreStart);
-  const block = appSource.slice(restoreStart, restoreEnd);
-  assert.match(block, /expectedLastModified/);
-  assert.match(block, /actualLastModified/);
-  assert.match(block, /externalChange/);
-  assert.match(block, /mantendo a cópia local protegida/);
-});
-
-test('armazenamento local impede que gravações antigas terminem por cima de versões novas', () => {
-  assert.match(localStoreSource, /savedAtMs/);
-  assert.match(localStoreSource, /nextSavedAt >= existingSavedAt/);
-  assert.match(localStoreSource, /const request = store\.get\(key\)/);
-});
-
 test('service worker inclui os módulos e não ativa atualização durante install', () => {
-  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v65-entry-flow'/);
+  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v66-projects'/);
   assert.match(swSource, /\.\/api-config\.js/);
   assert.match(swSource, /\.\/src\/prof-model\.js/);
-  assert.match(swSource, /\.\/src\/local-store\.js/);
+  for (const mod of ['project-store', 'prg-transfer', 'drive-sync', 'ded-project', 'views-projects']) {
+    assert.match(swSource, new RegExp(`\\./src/${mod}\\.js`));
+  }
+  assert.doesNotMatch(swSource, /local-store|drive-bindings|views-welcome/);
   assert.match(swSource, /\.\/src\/file-io\.js/);
   assert.match(swSource, /\.\/src\/ded-parser\.js/);
   assert.match(swSource, /\.\/src\/ded-pdf\.js/);
@@ -437,14 +248,15 @@ test('service worker inclui os módulos e não ativa atualização durante insta
   assert.match(swSource, /\.\/src\/views-reports\.js/);
   assert.match(swSource, /\.\/src\/views-class\.js/);
   assert.match(swSource, /\.\/src\/views-file-settings\.js/);
-  assert.match(swSource, /\.\/src\/views-welcome\.js/);
   assert.doesNotMatch(swSource, /then\(\(\) => self\.skipWaiting\(\)\)/);
   assert.match(swSource, /if \(response\.ok\)/);
 });
 
 test('app importa as camadas modulares e roda como ES module', () => {
   assert.match(appSource, /from '\.\/src\/prof-model\.js'/);
-  assert.match(appSource, /from '\.\/src\/local-store\.js'/);
+  assert.match(appSource, /from '\.\/src\/project-store\.js'/);
+  assert.match(appSource, /from '\.\/src\/drive-sync\.js'/);
+  assert.match(appSource, /from '\.\/src\/prg-transfer\.js'/);
   assert.match(htmlSource, /<script type="module" src="app\.js"><\/script>/);
 });
 
@@ -557,63 +369,6 @@ test('transporte HTTP do Drive renova token uma vez após 401', async () => {
   }
 });
 
-test('camada de I/O de arquivos está modularizada', async () => {
-  const fileIoSource = fs.readFileSync(path.join(root, 'frontend', 'src/file-io.js'), 'utf8');
-  assert.match(appSource, /from '\.\/src\/file-io\.js'/);
-  assert.match(fileIoSource, /export function normalizePrgFileName/);
-  assert.match(fileIoSource, /export async function readTextFileUtf8/);
-  assert.match(fileIoSource, /export async function shareFile/);
-  assert.match(fileIoSource, /export function downloadTextFile/);
-
-  const {
-    normalizePrgFileName,
-    supportsNativeFilePicker,
-    supportsNativeSavePicker,
-    supportsFileShare,
-    isAndroidDevice,
-    shareFile,
-  } = await import('../frontend/src/file-io.js');
-
-  assert.equal(normalizePrgFileName('Minha Aula.prg.json'), 'Minha Aula.prg');
-  assert.equal(normalizePrgFileName('C:/temp/Projeto'), 'Projeto.prg');
-  assert.equal(normalizePrgFileName('Projeto.prof'), 'Projeto.prof.prg');
-  assert.equal(isAndroidDevice({ userAgent: 'Mozilla/5.0 Android 15 Chrome/153' }), true);
-  assert.equal(isAndroidDevice({ userAgent: 'Mozilla/5.0 Windows NT 10.0' }), false);
-  assert.equal(supportsNativeFilePicker({ showOpenFilePicker() {} }), true);
-  assert.equal(supportsNativeSavePicker({ showSaveFilePicker() {} }, { userAgent: 'Android' }), false);
-  assert.equal(supportsNativeSavePicker({ showSaveFilePicker() {} }, { userAgent: 'Windows' }), true);
-  assert.equal(supportsFileShare({ share() {}, canShare() {} }, class FakeFile {}), true);
-  assert.equal(supportsFileShare({ share() {} }, class FakeFile {}), true);
-
-  let sharedData;
-  class FakeFile {
-    constructor(parts, name, options) {
-      this.parts = parts;
-      this.name = name;
-      this.type = options.type;
-    }
-  }
-  const fakeNavigator = {
-    share(data) {
-      sharedData = data;
-      return Promise.resolve();
-    }
-  };
-  const sharing = shareFile('arquivo serializado', 'turma.prg', 'application/vnd.prgessorgest', fakeNavigator, FakeFile);
-  assert.ok(sharedData, 'navigator.share deve ser chamado durante a ativação do clique');
-  assert.equal(sharedData.files[0].name, 'turma.prg');
-  assert.equal(sharedData.files[0].type, 'application/vnd.prgessorgest');
-  assert.deepEqual(sharedData.files[0].parts, ['arquivo serializado']);
-  assert.equal(await sharing, true);
-});
-
-test('recovery cancela gravações assíncronas obsoletas', () => {
-  assert.match(appSource, /recoveryWriteToken/);
-  assert.match(appSource, /token !== recoveryWriteToken/);
-  assert.match(appSource, /recoveryWriteToken \+= 1/);
-});
-
-
 test('camada de navegação é modular e preserva navegação por teclado', async () => {
   const navigationSource = fs.readFileSync(path.join(root, 'frontend', 'src/ui-navigation.js'), 'utf8');
   assert.match(appSource, /from '\.\/src\/ui-navigation\.js'/);
@@ -708,27 +463,30 @@ test('views de relatórios estão fora do app monolítico', async () => {
 
 test('views preservam estado reatribuído por getters', async () => {
   const { createFileSettingsRenderers } = await import('../frontend/src/views-file-settings.js');
-  let currentState = { createdAt: '2026-09-01', updatedAt: '2026-09-02', version: 3, teacher: { name: 'A', school: '', subject: '' } };
-  let fileName = 'primeiro.prg';
+  let currentState = { createdAt: '2026-09-01', updatedAt: '2026-09-02', version: 3, teacher: { name: 'A' } };
+  let info = { name: 'primeiro', classCount: 1, studentCount: 2, localLabel: 'Salvo neste dispositivo', linked: false, syncLabel: '', tone: 'neutral', lastBackupAt: null };
   let dirty = false;
-  let demo = false;
   const views = createFileSettingsRenderers({
-    getState: () => currentState, esc: value => String(value), getDemoMode: () => demo,
-    getCurrentFileName: () => fileName, getIsDirty: () => dirty, ICONS: { file:'', folder:'', save:'', copy:'', cloud:'', share:'', plus:'' },
-    supportsFileShare: () => false, driveStatusTone: () => 'ok', driveStatusText: () => 'Local', driveBindingForCurrentProject: () => null,
+    getState: () => currentState, esc: value => String(value), getDemoMode: () => false,
+    getIsDirty: () => dirty, ICONS: { file:'', folder:'', save:'', copy:'', cloud:'', share:'', plus:'', refresh:'', trash:'' },
+    supportsFileShare: () => false, getProjectInfo: () => info, getDriveAccount: () => null,
     fmtDate: value => String(value), fmtDateTime: value => String(value), getThemeMode: () => 'light', getDevLogEntries: () => []
   });
-  assert.match(views.renderArquivo(), /primeiro\.prg/);
-  currentState = { createdAt: '2027-01-01', updatedAt: '2027-01-02', version: 3, teacher: { name: 'B', school: '', subject: '' } };
-  fileName = 'segundo.prg';
+  assert.match(views.renderArquivo(), /primeiro/);
+  currentState = { createdAt: '2027-01-01', updatedAt: '2027-01-02', version: 3, teacher: { name: 'B' } };
+  info = { ...info, name: 'segundo', localLabel: 'Salvando neste dispositivo…' };
   dirty = true;
   const next = views.renderArquivo();
-  assert.match(next, /segundo\.prg/);
-  assert.doesNotMatch(next, /primeiro\.prg/);
-  assert.match(next, /Salvando automaticamente…/);
+  assert.match(next, /segundo/);
+  assert.doesNotMatch(next, /primeiro/);
+  assert.match(next, /Salvando neste dispositivo…/);
+  assert.match(next, /Enviar ao Google Drive/);
+  info = { ...info, linked: true, syncLabel: 'Alterações pendentes no Drive', driveFileName: 'segundo.prg' };
+  const linked = views.renderArquivo();
+  assert.match(linked, /Sincronizar agora/);
+  assert.match(linked, /Desvincular/);
+  assert.match(linked, /btnDeleteProjectEverywhere/);
 });
-
-
 test('view de turma está fora do app monolítico', async () => {
   const { createClassViewRenderers } = await import('../frontend/src/views-class.js');
   let state = { classes: [{ id: 'c1', name: '1º A', archived: false }], students: [], activities: [], occurrences: [] };
@@ -744,15 +502,6 @@ test('view de turma está fora do app monolítico', async () => {
   state = { classes: [{ id: 'c2', name: '2º B', archived: false }], students: [], activities: [], occurrences: [] };
   ctx.classId = 'c2';
   assert.match(views.renderTurmaDetail(), /2º B/);
-});
-
-
-test('view de boas-vindas está fora do app monolítico', async () => {
-  const moduleSource = fs.readFileSync(path.join(root, 'frontend', 'src/views-welcome.js'), 'utf8');
-  assert.match(moduleSource, /createWelcomeViewRenderer/);
-  assert.match(moduleSource, /readLocalRecoveryDraft/);
-  assert.match(moduleSource, /restorePersistedProject/);
-  assert.doesNotMatch(appSource, /function renderWelcomeRecovery\(\)\s*\{[\s\S]*readLocalRecoveryDraft\(\)/);
 });
 
 
@@ -792,38 +541,6 @@ test('labels de formulário dinâmicos permanecem associados', () => {
   assert.match(appSource, /<label class=\"form-label\" for=\"quickSearchInput\">/);
 });
 
-test('recovery da tela inicial não depende de funções legadas ausentes', () => {
-  assert.doesNotMatch(appSource, /readLegacyRecoveryDraft/);
-  assert.match(appSource, /async function hydrateRecoveryCache/);
-  assert.match(appSource, /readLatestRecoveryRecord\(\)/);
-  assert.doesNotMatch(appSource, /Number\(record\.state\.version\) !== PRG_VERSION/);
-});
-
-test('cartão Criar novo arquivo não interpola background durante hover', () => {
-  assert.match(cssSource, /\.welcome-card\.primary:hover\{background:linear-gradient/);
-  assert.doesNotMatch(cssSource, /\.welcome-card\{[^}]*transition:[^}]*background/);
-  assert.match(cssSource, /\.welcome-card\.primary,\.welcome-card\.primary:hover\{color:#fff/);
-});
-
-test('fechar o arquivo fica disponível no cabeçalho como retorno ao início', () => {
-  assert.match(indexSource, /id=\"topbarHomeBtn\"/);
-  assert.match(indexSource, /aria-label=\"Voltar ao início\"/);
-  assert.match(appSource, /onClick\('#topbarHomeBtn', \(\) => closeCurrentFile\(\)\)/);
-  assert.match(cssSource, /\.topbar-home-button\s*\{/);
-  assert.match(cssSource, /\.topbar-home-button span \{ display: none; \}/);
-  assert.doesNotMatch(fs.readFileSync(path.join(root, 'frontend', 'src', 'views-file-settings.js'), 'utf8'), /id=\"btnCloseFile\"/);
-});
-
-test('polimento de Arquivos preserva todas as ações de arquivo', () => {
-  const view = fs.readFileSync(path.join(root, 'frontend', 'src', 'views-file-settings.js'), 'utf8');
-  for (const id of ['btnOpenFile','btnOpenBackups','btnDriveOpen','btnDriveAction','btnExportPrg','btnSharePrg','btnExportCsv','btnImportCsv']) {
-    assert.match(view, new RegExp(`id="${id}"`), `Ação ausente na tela de Arquivos: ${id}`);
-  }
-  assert.match(view, /btnGoFileFromSettings/);
-  assert.doesNotMatch(view, /id="btnSaveFile"/);
-  assert.match(view, /Salvo automaticamente neste dispositivo/);
-});
-
 test('reforma de aluno preserva ações individuais', () => {
   const view = fs.readFileSync(path.join(root, 'frontend', 'src', 'views-students-activities.js'), 'utf8');
   assert.match(view, /id="btnRegisterForStudent"/);
@@ -833,20 +550,6 @@ test('reforma de aluno preserva ações individuais', () => {
   assert.match(appSource, /studentActionReport/);
 });
 
-test('interface não oferece salvar manual como ação principal do projeto', () => {
-  assert.doesNotMatch(indexSource, /topbarSaveAction/);
-  assert.doesNotMatch(appSource, /id=\"topbarSaveBtn\"/);
-  assert.doesNotMatch(appSource, /onClick\('#btnSaveFile'/);
-  assert.match(appSource, /Salvo automaticamente neste dispositivo/);
-  assert.match(appSource, /Atualize o Drive/);
-  assert.match(appSource, /Há alterações salvas neste dispositivo. Clique para atualizar o Google Drive/);
-});
-
-test('palette de ações não oferece salvar manualmente; Drive fica como ação explícita de nuvem', () => {
-  assert.doesNotMatch(appSource, /label: 'Salvar arquivo'/);
-  assert.match(appSource, /label: driveBindingForCurrentProject\(\) \? 'Atualizar no Google Drive' : 'Conectar ao Google Drive'/);
-});
-
 test('busca global inclui planejamento sem remover alunos, turmas e atividades', () => {
   assert.match(appSource, /data-cmdk-student/);
   assert.match(appSource, /data-cmdk-class/);
@@ -854,66 +557,10 @@ test('busca global inclui planejamento sem remover alunos, turmas e atividades',
   assert.match(appSource, /data-cmdk-plan/);
 });
 
-test('Google Drive é descoberto fora da área de Arquivos', () => {
-  assert.match(indexSource, /id=\"topbarDriveBtn\"/);
-  assert.match(appSource, /btnDashboardDrive/);
-  assert.match(coreViewSource, /Conectar Google Drive/);
-  assert.match(appSource, /Atualizar no Google Drive/);
-});
-
 test('navegação reorganizada mantém todas as áreas do aplicativo', () => {
   for (const key of ['dashboard','turmas','alunos','atividades','planejamento','calendario','ocorrencias','relatorios','arquivo','configuracoes']) {
     assert.match(appSource, new RegExp(`key: '${key}'`), `Área ausente da navegação: ${key}`);
   }
-});
-
-test('tela inicial mostra somente o projeto local mais recente sem repetir o cartão durante a hidratação', () => {
-  assert.match(welcomeViewSource, /Recuperação disponível/);
-  assert.match(welcomeViewSource, /alterações protegidas/);
-  assert.match(welcomeViewSource, /Último projeto neste dispositivo/);
-  assert.match(welcomeViewSource, /readLocalProjectRecords/);
-  assert.match(welcomeViewSource, /sameProject/);
-  assert.match(welcomeViewSource, /Abrir versão salva/);
-  assert.match(welcomeViewSource, /Continuar com a recuperação/);
-  assert.match(welcomeViewSource, /readLocalProjectRecords\(4\)/);
-  assert.match(welcomeViewSource, /renderToken/);
-  assert.doesNotMatch(welcomeViewSource, /Projetos neste dispositivo/);
-  assert.doesNotMatch(welcomeViewSource, /restorePersistedProjectById/);
-});
-
-test('tela inicial não duplica o acesso aos dados locais no cartão de trabalho recente', () => {
-  assert.doesNotMatch(welcomeViewSource, /Gerenciar dados deste dispositivo/);
-  assert.doesNotMatch(appSource, /welcomeManageData/);
-  assert.match(htmlSource, /id="welcomeSettings"/);
-  assert.match(appSource, /id="btnOpenLocalDataManager"/);
-});
-
-test('configurações da tela inicial troca o tema sem fechar e reabrir o modal', () => {
-  const start = appSource.indexOf('function openWelcomeSettingsModal()');
-  const end = appSource.indexOf('async function showWelcomeScreen', start);
-  const block = appSource.slice(start, end);
-  assert.ok(start >= 0 && end > start);
-  assert.match(block, /applyThemeMode\(nextMode\)/);
-  assert.match(block, /classList\.toggle\('active', active\)/);
-  assert.match(block, /aria-pressed/);
-  assert.doesNotMatch(block, /closeModal\(\);\n\s*openWelcomeSettingsModal\(\)/);
-});
-
-test('tela inicial tem uma única rotina de preparação por chamada', () => {
-  const start = appSource.indexOf('async function showWelcomeScreen');
-  const end = appSource.indexOf('function showSetupScreen', start);
-  const block = appSource.slice(start, end);
-  assert.ok(start >= 0 && end > start);
-  assert.equal(block.split("document.getElementById('welcomeScreen')?.classList.remove('is-hidden')").length - 1, 1);
-  assert.match(block, /await hydrateRecoveryCache\(\);\s*await renderWelcomeRecovery\(\);/);
-  assert.doesNotMatch(block, /hydrateRecoveryCache\(\)\.then/);
-});
-
-test('cópias de segurança permanecem acessíveis mesmo quando ainda não existem', () => {
-  assert.match(htmlSource, /<button class="welcome-secondary-action" id="welcomeBackups"/);
-  assert.match(appSource, /button\.classList\.remove\('is-hidden'\)/);
-  assert.match(appSource, /Ainda não há cópias de segurança/);
-  assert.match(appSource, /welcomeBackups.*addEventListener\('click', \(\) => openBackupsModal\(\{ global: true \}\)\)/);
 });
 
 test('navegação usa histórico real e restaura rota após reload', () => {
@@ -923,7 +570,7 @@ test('navegação usa histórico real e restaura rota após reload', () => {
   assert.match(navigationSource, /addEventListener\('popstate'/);
   assert.match(navigationSource, /history\.back\(\)/);
   assert.match(navigationSource, /sessionStorage\.setItem\(ROUTE_KEY/);
-  assert.match(appSource, /restorePersistedProjectById\(savedRoute\.projectId/);
+  assert.match(appSource, /openProject\(savedRoute\.projectId/);
   assert.match(appSource, /navigation\.restoreWorkspaceRoute\(savedRoute\)/);
   assert.match(appSource, /getPersistedRoute\(\)/);
 });
@@ -998,13 +645,13 @@ test('não há estilos inline restantes no frontend', () => {
 });
 
 
-test('importação do DED possui pré-validação de limites e não deve permitir excesso de dados', () => {
-  assert.match(appSource, /const capacity = planDedImport\(unique, \{ newProject \}\);/);
-  assert.match(appSource, /O limite de \$\{MAX_CLASSES\} turmas seria ultrapassado/);
-  assert.match(appSource, /O limite de \$\{MAX_STUDENTS\} alunos seria ultrapassado/);
-  assert.match(appSource, /if \(!state \|\| !Array\.isArray\(state\.classes\)/);
+test('importação do DED possui pré-validação de limites e não permite excesso de dados', () => {
+  const src = fs.readFileSync(path.join(root, 'frontend', 'src', 'ded-project.js'), 'utf8');
+  assert.match(src, /O limite de \$\{MAX_CLASSES\} turmas seria ultrapassado/);
+  assert.match(src, /O limite de \$\{MAX_STUDENTS\} alunos seria ultrapassado/);
+  assert.match(src, /structuredClone\(state\)/);
+  assert.match(appSource, /if \(!preview\.ok\)/);
 });
-
 test('carregamento do PDF.js pode ser tentado novamente depois de uma falha', () => {
   const pdfSource = fs.readFileSync(path.join(root, 'frontend', 'src', 'ded-pdf.js'), 'utf8');
   assert.match(pdfSource, /pdfjsPromise = null;/);
@@ -1081,138 +728,16 @@ test('build e service worker incluem a primitiva compartilhada de pesquisa', () 
   assert.match(fs.readFileSync(path.join(root, 'scripts', 'build-pages.mjs'), 'utf8'), /'ui-search\.js'/);
 });
 
-test('abertura nativa de .prg não referencia navigateToDashboard fora de escopo', () => {
-  const openFileStart = appSource.indexOf('async function openFile(');
-  const openFileEnd = appSource.indexOf('async function handleFileOpenInput', openFileStart);
-  assert.ok(openFileStart >= 0 && openFileEnd > openFileStart);
-  const openFileSource = appSource.slice(openFileStart, openFileEnd);
-  assert.doesNotMatch(openFileSource, /\bnavigateToDashboard\s*,/);
-  assert.match(openFileSource, /navigateToDashboard:\s*true/);
-});
-
-test('errorMessage está definida e cobre todos os códigos de erro do validador', () => {
-  assert.match(appSource, /function errorMessage\(code\)/);
-  const start = appSource.indexOf('function errorMessage(code)');
-  const body = appSource.slice(start, appSource.indexOf('async function openDriveFileById', start));
-  for (const code of ['size', 'json', 'format', 'version', 'projectId', 'shape', 'limits', 'integrity']) {
-    assert.match(body, new RegExp(`case '${code}'`));
-  }
-});
-
-function functionSource(name) {
-  const start = appSource.indexOf(`function ${name}(`);
-  assert.ok(start >= 0, `${name} não encontrada`);
-  const next = appSource.indexOf('\nfunction ', start + 10);
-  const nextAsync = appSource.indexOf('\nasync function ', start + 10);
-  const ends = [next, nextAsync].filter(i => i > 0);
-  return appSource.slice(start, Math.min(...ends));
-}
-
-test('salvamento não troca o state por uma cópia antiga após await (perda de edições)', () => {
-  assert.doesNotMatch(appSource, /\bstate = payload;/);
-  assert.match(appSource, /function adoptSavedPayload\(payload\)/);
-});
-
-test('autosave e Salvar manual compartilham a mesma trava de escrita do arquivo', () => {
-  assert.match(appSource, /function withFileWriteLock\(task\)/);
-  assert.match(appSource, /withFileWriteLock\(\(\) => writeCurrentFileHandleAutomaticallyUnlocked\(payload(?:,\s*\{[\s\S]*?\})?\)/);
-  assert.match(appSource, /await withFileWriteLock\(async \(\) => \{\s*const writable = await handleToWrite\.createWritable\(\)/);
-});
-
-test('ação manual do Drive é single-flight e bloqueia todos os botões de entrada', () => {
-  assert.match(appSource, /let driveActionPromise = null;/);
-  assert.match(appSource, /if \(driveActionPromise\) return driveActionPromise;/);
-  assert.match(appSource, /qAll\('#topbarDriveBtn, #btnDriveAction, #btnDriveActionSettings, #btnDashboardDrive'\)/);
-  assert.match(appSource, /button\.disabled = driveActionPending/);
-  assert.match(appSource, /Atualizando…/);
-});
-
-test('Drive não possui mais caminho automático de sincronização', () => {
-  assert.doesNotMatch(appSource, /scheduleCloudAutoSync/);
-  assert.doesNotMatch(appSource, /primeDriveSessionForCurrentProject/);
-  assert.doesNotMatch(appSource, /cloudAutoSync/);
-});
-
-test('marcar alteração só sinaliza o Drive como pendente e nunca inicia upload', () => {
-  const start = appSource.indexOf('function markDirty');
-  const end = appSource.indexOf('function scheduleAutomaticSave', start);
-  const block = appSource.slice(start, end);
-  assert.match(block, /cloudSyncPending = true/);
-  assert.match(block, /scheduleAutomaticSave\(\)/);
-  assert.doesNotMatch(block, /saveCurrentToGoogleDrive\(/);
-  assert.doesNotMatch(block, /scheduleCloudAutoSync/);
-});
-
-test('estado visual do Drive deixa explícito quando há atualização manual pendente', () => {
-  assert.match(appSource, /if \(saveUiState === 'syncing'\) return 'Atualizando o Google Drive…'/);
-  assert.match(appSource, /if \(isDirty \|\| cloudSyncPending\) return 'Há alterações que ainda não foram enviadas ao Drive'/);
-  assert.match(appSource, /pending \|\| isDirty \? 'Atualizar Drive' : 'Drive atualizado'/);
-});
-
-test('vínculo atualizado do Drive não é sobrescrito por snapshot local antigo', () => {
-  assert.match(appSource, /currentSyncAt = Date\.parse\(currentBinding\?\.lastSyncAt \|\| ''\)/);
-  assert.match(appSource, /incomingSyncAt = Date\.parse\(incomingBinding\.lastSyncAt \|\| ''\)/);
-  assert.match(appSource, /incomingSyncAt >= currentSyncAt/);
-});
-
-test('atualização manual salva localmente o novo metadado do vínculo após upload', () => {
-  const src = appSource.slice(appSource.indexOf('async function saveCurrentToGoogleDriveUnlocked'), appSource.indexOf('function disconnectCurrentDriveFile'));
-  assert.match(src, /driveBindingOverride: driveBindingForCurrentProject\(\)/);
-  assert.match(src, /storageMode: 'drive'/);
-});
-
-
-test('estado pendente do Drive é persistido no snapshot local para sobreviver ao reload', () => {
-  assert.match(appSource, /driveSyncPendingOverride = undefined/);
-  assert.match(appSource, /driveSyncPending: driveSyncPendingOverride !== undefined/);
-  assert.match(appSource, /driveSyncPending: !!record\.driveSyncPending/);
-});
-
-test('reabertura de projeto com Drive pendente permanece aguardando ação manual', () => {
-  assert.doesNotMatch(appSource, /primeDriveSessionForCurrentProject\(\)/);
-  assert.doesNotMatch(appSource, /scheduleCloudAutoSync\(1200\)/);
-  assert.match(appSource, /else if \(cloudSyncPending && driveBindingForCurrentProject\(\)\) \{ statusLine = 'Atualize o Drive'/);
-});
-
-test('sincronização manual persiste o estado final do vínculo depois de limpar pendências', () => {
-  const src = appSource.slice(appSource.indexOf('async function saveCurrentToGoogleDriveUnlocked'), appSource.indexOf('function disconnectCurrentDriveFile'));
-  assert.match(src, /driveSyncPendingOverride: !syncStillCurrent/);
-});
-
-test('salvamento local persiste o snapshot capturado sem apagar edições posteriores nem atualizar o Drive', () => {
-  const saveStart = appSource.indexOf('async function saveFile');
-  const saveEnd = appSource.indexOf('/* ==================== ARQUIVO / CONFIGURAÇÕES', saveStart);
-  const block = appSource.slice(saveStart, saveEnd);
-  assert.match(block, /const payload = buildSavePayload\(\)/);
-  assert.match(block, /const saveRevision = dirtyRevision/);
-  assert.match(block, /if \(!unchangedSinceSaveStarted\)/);
-  assert.match(block, /persistLocalRecoveryDraft\(\)/);
-  assert.doesNotMatch(block, /adoptSavedPayload\(payload\)/);
-  assert.doesNotMatch(block, /syncCurrentProjectToDrive\(/);
-});
-
-test('salvamento no Drive registra a revisão efetivamente enviada e atualiza o snapshot local', () => {
-  assert.match(appSource, /lastDriveUploadRevision = dirtyRevision/);
-  assert.match(appSource, /lastDriveUploadRevision = dirtyRevision/);
-  assert.match(appSource, /driveBindingOverride: driveBindingForCurrentProject\(\)/);
-});
-
 test('Drive cria e atualiza o arquivo em uma única requisição multipart', () => {
-  const create = appSource.slice(appSource.indexOf('async function createDriveFileFromCurrent'), appSource.indexOf('async function getDriveMeta'));
-  assert.match(create, /uploadType=multipart/);
-  assert.doesNotMatch(create, /uploadType=media/);
-  assert.doesNotMatch(create, /method: 'PATCH',\s*headers: \{ 'Content-Type': 'application\/json' \}/);
+  const src = fs.readFileSync(path.join(root, 'frontend', 'src', 'drive-sync.js'), 'utf8');
+  assert.equal((src.match(/uploadType=multipart/g) || []).length, 2);
+  assert.doesNotMatch(src, /uploadType=media/);
+  assert.match(src, /appProperties/);
 });
-
 test('login do Google trata popup bloqueado/fechado via error_callback', () => {
   assert.match(appSource, /error_callback:/);
   assert.match(appSource, /driveTokenClient\.errorCallback = /);
   assert.match(appSource, /popup_failed_to_open/);
-});
-
-test('sincronização forçada não reutiliza uma sincronização normal em andamento', () => {
-  const src = functionSource('syncCurrentProjectToDrive');
-  assert.match(src, /if \(!force\) return driveSyncPromise;/);
 });
 
 test('remover/trocar conta Google atualiza a tela inicial e a barra superior', () => {
@@ -1237,13 +762,31 @@ test('resposta de login atrasada da conta antiga não reativa a sessão removida
 });
 
 
-test('restauração local não trata o vínculo persistido como metadado novo do Drive', () => {
-  assert.match(appSource, /applyOpenedData\(record\.state, record\.currentFileName \|\| 'Projeto local', null, null, \{/);
-  assert.match(appSource, /applyOpenedData\(record\.state, record\.currentFileName \|\| file\.name \|\| 'Projeto local', null, null, \{/);
+
+test('políticas legais descrevem projetos locais, .prg portátil e o escopo drive.file', () => {
+  const privacy = fs.readFileSync(path.join(root, 'frontend', 'privacidade.html'), 'utf8');
+  const terms = fs.readFileSync(path.join(root, 'frontend', 'termos.html'), 'utf8');
+  const sentence = /armazena os projetos localmente no dispositivo/;
+  assert.match(privacy, sentence);
+  assert.match(terms, sentence);
+  for (const doc of [privacy, terms]) {
+    assert.match(doc, /portátil para importação e exportação/);
+    assert.match(doc, /armazenamento\/sincronização em nuvem/);
+    assert.match(doc, /drive\.file/);
+  }
+  assert.match(privacy, /appProperties|propriedades privadas/);
+  assert.doesNotMatch(privacy + terms, /arquivo \.prg continua sendo a cópia principal|abrir ou salvar um projeto no Google Drive/);
 });
 
-test('sessão do Drive só é solicitada por uma ação explícita do usuário', () => {
-  assert.doesNotMatch(appSource, /async function primeDriveSessionForCurrentProject\(\)/);
-  assert.match(appSource, /requestDriveAccessTokenFromClick/);
-  assert.match(appSource, /await getDriveAccessToken\(\{ forceConsent: false \}\)/);
+test('barra superior mostra o status uma única vez e o botão de volta leva a "Projetos"', () => {
+  const fn = appSource.slice(appSource.indexOf('function topbarFileHTML'), appSource.indexOf('function rerenderKeepFocus'));
+  assert.doesNotMatch(fn, /topbar-status/, 'topbarFileHTML não repete o status do chip');
+  assert.match(htmlSource, /<span>Projetos<\/span>/);
+  assert.match(htmlSource, /aria-label="Voltar para Seus projetos"/);
+  assert.match(appSource, /topbarDrive\.hidden = demoMode \|\| !configured/);
+});
+
+test('listas de ações separam título e descrição em linhas distintas', () => {
+  assert.match(cssSource, /\.action-list-item > span \{[^}]*flex-direction: column/);
+  assert.match(cssSource, /\.choice-card strong\s*\{[^}]*display:\s*block|\.choice-card strong\{[^}]*display:block/);
 });

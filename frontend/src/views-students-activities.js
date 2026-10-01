@@ -18,7 +18,7 @@ export function createStudentActivityRenderers(deps) {
   function studentMeta(student) {
     const stats = studentStats(student);
     const lastOccurrence = [...occurrencesOf(student.id)].sort((a, b) => b.date.localeCompare(a.date))[0];
-    return `${classNameOf(student.classId)} · ${stats.totalFollowUps} acompanhamento(s)${lastOccurrence ? ` · último ${fmtDate(lastOccurrence.date)}` : ''}`;
+    return `${classNameOf(student.classId)} · ${stats.totalFollowUps} ${stats.totalFollowUps === 1 ? 'acompanhamento' : 'acompanhamentos'}${lastOccurrence ? ` · último ${fmtDate(lastOccurrence.date)}` : ''}`;
   }
 
   function studentListItemsHTML(list) {

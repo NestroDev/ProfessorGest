@@ -35,9 +35,12 @@ export async function driveJson(url, config = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       data?.error?.message || `Google Drive respondeu com ${response.status}.`,
     );
+    error.status = response.status;
+    error.code = data?.error?.code || `HTTP_${response.status}`;
+    throw error;
   }
 
   return data;

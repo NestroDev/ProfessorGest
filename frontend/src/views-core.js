@@ -4,7 +4,7 @@ export function createCoreViewRenderers(api) {
     activeStudents, activeActivities, activeClasses,
     classStats, studentById, classNameOf, assignmentsOf = () => [], schoolById = () => null,
     attentionItems, todayISO, greeting, esc, fmtDate,
-    emptyState, badgeFor, ICONS, searchFieldHTML, driveBindingForCurrentProject = () => null, getDriveActionPending = () => false, getDriveSyncPending = () => false
+    emptyState, badgeFor, ICONS, searchFieldHTML, driveLinkForCurrentProject = () => null, getDriveAvailable = () => true, getDriveActionPending = () => false, getDriveSyncPending = () => false
   } = api;
 
   function renderDashboard() {
@@ -37,22 +37,22 @@ export function createCoreViewRenderers(api) {
         </div>
       </section>
 
-      ${driveBindingForCurrentProject() && getDriveSyncPending() ? `
+      ${!getDriveAvailable() ? '' : driveLinkForCurrentProject() && getDriveSyncPending() ? `
       <section class="dashboard-drive-promo card">
         <div class="dashboard-drive-promo-icon">${ICONS.cloud}</div>
         <div class="dashboard-drive-promo-copy">
-          <strong>Há alterações para atualizar no Google Drive</strong>
-          <span>O projeto já está salvo neste dispositivo. Atualize o Drive manualmente quando quiser enviar esta versão.</span>
+          <strong>Há alterações pendentes no Google Drive</strong>
+          <span>O projeto já está salvo neste dispositivo. Sincronize quando quiser enviar esta versão para a nuvem.</span>
         </div>
-        <button type="button" class="btn-secondary" id="btnDashboardDrive" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Atualizando…' : ICONS.cloud + ' Atualizar Drive'}</button>
-      </section>` : (!driveBindingForCurrentProject() ? `
+        <button type="button" class="btn-secondary" id="btnDashboardDrive" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Sincronizando…' : ICONS.cloud + ' Sincronizar agora'}</button>
+      </section>` : (!driveLinkForCurrentProject() ? `
       <section class="dashboard-drive-promo card">
         <div class="dashboard-drive-promo-icon">${ICONS.cloud}</div>
         <div class="dashboard-drive-promo-copy">
           <strong>Proteja seu projeto com o Google Drive</strong>
-          <span>Envie este arquivo para a nuvem quando quiser continuar seu trabalho em outro computador ou celular.</span>
+          <span>Envie este projeto para a nuvem quando quiser continuar seu trabalho em outro computador ou celular.</span>
         </div>
-        <button type="button" class="btn-secondary" id="btnDashboardDrive" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Atualizando…' : ICONS.cloud + ' Conectar Google Drive'}</button>
+        <button type="button" class="btn-secondary" id="btnDashboardDrive" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Sincronizando…' : ICONS.cloud + ' Enviar ao Google Drive'}</button>
       </section>` : '')}
 
       <div class="dashboard-stats">

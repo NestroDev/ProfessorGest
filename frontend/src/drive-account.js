@@ -63,3 +63,32 @@ export function clearDriveAccount(storage = globalThis.localStorage) {
     return false;
   }
 }
+
+/**
+ * Estado de autorização exibido na interface. O token NUNCA é persistido;
+ * só a identidade (nome, e-mail, foto, permissionId) fica lembrada.
+ *   none        -> nenhuma conta lembrada
+ *   remembered  -> conta lembrada, ainda sem autorização nesta sessão
+ *   authorized  -> token válido em memória
+ *   expired     -> havia autorização, mas o token expirou (renovação silenciosa possível)
+ *   reconnect   -> o Google exige interação do usuário (sem popup automático)
+ */
+export const DRIVE_AUTH_STATES = Object.freeze({
+  NONE: 'none', REMEMBERED: 'remembered', AUTHORIZED: 'authorized', EXPIRED: 'expired', RECONNECT: 'reconnect',
+});
+
+export function driveAuthState({ account = null, hasToken = false, tokenExpiresAt = 0, needsInteraction = false, now = Date.now() } = {}) {
+  if (!account) return DRIVE_AUTH_STATES.NONE;
+  if (needsInteraction) return DRIVE_AUTH_STATES.RECONNECT;
+  if (hasToken && Number(tokenExpiresAt) > now + 30_000) return DRIVE_AUTH_STATES.AUTHORIZED;
+  if (hasToken) return DRIVE_AUTH_STATES.EXPIRED;
+  return DRIVE_AUTH_STATES.REMEMBERED;
+}
+
+export const DRIVE_AUTH_LABELS = Object.freeze({
+  none: 'Nenhuma conta Google conectada',
+  remembered: 'Conta lembrada neste dispositivo',
+  authorized: 'Autorização disponível',
+  expired: 'Autorização expirada',
+  reconnect: 'É preciso reconectar a conta',
+});

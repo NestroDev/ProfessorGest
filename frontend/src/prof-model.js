@@ -410,6 +410,7 @@ export function validateProjectData(input) {
     projectId: String(data.projectId),
     createdAt,
     updatedAt,
+    ...(String(data.name ?? '').trim() ? { name: textField(String(data.name).trim(), 200) } : {}),
     teacher: {
       name: textField(data.teacher?.name, 300) || 'Professor',
     },

@@ -30,8 +30,10 @@ const files = [
 
 const modules = [
   'prof-model.js',
-  'local-store.js',
-  'drive-bindings.js',
+  'project-store.js',
+  'prg-transfer.js',
+  'drive-sync.js',
+  'ded-project.js',
   'drive-account.js',
   'drive-http.js',
   'file-io.js',
@@ -46,7 +48,7 @@ const modules = [
   'views-reports.js',
   'views-class.js',
   'views-file-settings.js',
-  'views-welcome.js',
+  'views-projects.js',
   'views-planning.js',
   'ded-parser.js',
   'ded-pdf.js',

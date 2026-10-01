@@ -1,17 +1,17 @@
 export function createFileSettingsRenderers(deps) {
   const {
-    getState, esc, getDemoMode, getCurrentFileName, getIsDirty, ICONS, getDriveActionPending = () => false,
-    supportsFileShare, driveStatusTone, driveStatusText, driveBindingForCurrentProject, getDriveAccount = () => null,
-    fmtDate, fmtDateTime, getThemeMode, getDevLogEntries, getProjectBackups = () => []
+    getState, esc, getDemoMode, getIsDirty, ICONS, getDriveActionPending = () => false,
+    supportsFileShare, getProjectInfo, getDriveAccount = () => null,
+    fmtDate, fmtDateTime, getThemeMode, getDevLogEntries
   } = deps;
 
   function renderArquivo() {
     if (getDemoMode()) {
       return `
-        <div class="page-head"><div><h1>Demonstração</h1><div class="page-sub">Explore o ProfessorGest com dados de exemplo.</div></div><div class="page-actions"><button type="button" class="btn-primary" id="btnExitDemo">Criar meu arquivo</button></div></div>
+        <div class="page-head"><div><h1>Demonstração</h1><div class="page-sub">Explore o ProfessorGest com dados de exemplo.</div></div><div class="page-actions"><button type="button" class="btn-primary" id="btnExitDemo">Criar meu projeto</button></div></div>
         <div class="card demo-file-card">
           <div class="section-title section-title-first">Ambiente de demonstração</div>
-          <p class="settings-lead">Navegue pelas telas, abra alunos, veja atividades e experimente os relatórios. Este ambiente não substitui seu arquivo.</p>
+          <p class="settings-lead">Navegue pelas telas, abra alunos, veja atividades e experimente os relatórios. Este ambiente não altera os seus projetos.</p>
           <div class="demo-feature-grid">
             <div><strong>2 turmas</strong><span>com alunos e atividades</span></div>
             <div><strong>5 alunos</strong><span>com histórico e registros</span></div>
@@ -21,53 +21,71 @@ export function createFileSettingsRenderers(deps) {
         </div>
       `;
     }
-    const backups = getProjectBackups();
+    const info = getProjectInfo();
+    const st = getState();
+    const account = getDriveAccount();
+    const busy = getDriveActionPending();
     return `
-      <div class="page-head"><div><h1>Arquivos</h1><div class="page-sub">Abra, proteja e atualize seus arquivos.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnNewFile">${ICONS.file} Novo arquivo</button></div></div>
+      <div class="page-head"><div><h1>Projeto</h1><div class="page-sub">Nome, cópias de segurança, exportação e Google Drive deste projeto.</div></div><div class="page-actions"><button type="button" class="btn-secondary" id="btnBackToProjects">${ICONS.folder} Seus projetos</button><button type="button" class="btn-secondary" id="btnNewProject">${ICONS.file} Novo projeto</button></div></div>
 
       <section class="file-workspace card">
         <div class="file-workspace-head">
           <div>
-            <div class="eyebrow">ARQUIVO ATUAL</div>
-            <div class="file-current-name">${ICONS.file}${getCurrentFileName() ? `<strong>${esc(getCurrentFileName())}</strong>` : '<strong>Novo projeto</strong>'}</div>
-            <div class="file-current-status ${getIsDirty() ? 'dirty' : 'saved'}"><span class="status-dot"></span>${getIsDirty() ? 'Salvando automaticamente…' : 'Salvo automaticamente neste dispositivo'}</div>
+            <div class="eyebrow">PROJETO ATUAL</div>
+            <div class="file-current-name">${ICONS.file}<strong>${esc(info.name)}</strong></div>
+            <div class="file-current-status ${getIsDirty() ? 'dirty' : 'saved'}"><span class="status-dot"></span>${esc(info.localLabel)}</div>
           </div>
           <div class="file-primary-actions">
-            <button type="button" class="btn-secondary" id="btnOpenFile">${ICONS.folder} Abrir arquivo</button>
+            <button type="button" class="btn-secondary" id="btnRenameProject">Renomear</button>
           </div>
         </div>
+        <p class="file-meta-line">${info.classCount} ${info.classCount === 1 ? 'turma' : 'turmas'} · ${info.studentCount} ${info.studentCount === 1 ? 'aluno' : 'alunos'} · Criado em ${fmtDate(st.createdAt)} · Última alteração: ${fmtDateTime(info.updatedAt || st.updatedAt)}</p>
       </section>
 
       <div class="file-tools-grid">
         <section class="card file-tool-card">
           <div class="file-tool-icon">${ICONS.save}</div>
-          <div class="file-tool-copy"><strong>Cópias de segurança</strong><span>${backups.length ? `Última cópia: ${fmtDateTime(backups[0].savedAt)}` : 'Proteção automática ativada'}</span><p>O ProfessorGest guarda cópias recentes neste dispositivo para ajudar a recuperar seu trabalho.</p></div>
+          <div class="file-tool-copy"><strong>Cópias de segurança</strong><span>${info.lastBackupAt ? `Última cópia: ${fmtDateTime(info.lastBackupAt)}` : 'Proteção automática ativada'}</span><p>Cada projeto guarda as próprias cópias neste dispositivo: antes de ações importantes, ao atualizar pelo DED+ e em intervalos durante o trabalho.</p></div>
           <button type="button" class="btn-secondary" id="btnOpenBackups">${ICONS.folder} Ver cópias</button>
         </section>
 
-        <section class="card file-tool-card ${driveStatusTone()}">
-          <div class="file-tool-icon">${getDriveAccount() ? `<div class="drive-account-icon">${getDriveAccount().photoLink ? `<img src="${esc(getDriveAccount().photoLink)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</span>` : esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</div>` : ICONS.cloud}</div>
-          <div class="file-tool-copy"><strong>Google Drive</strong><span>${esc(driveStatusText())}</span><p>${getDriveAccount() ? `Conta: ${esc(getDriveAccount().email || getDriveAccount().displayName || 'Google')}. A conta lembrada será reutilizada ao atualizar o Drive.` : 'Conecte sua conta para poder atualizar o Drive quando decidir.'}</p></div>
+        <section class="card file-tool-card ${info.tone}">
+          <div class="file-tool-icon">${account ? `<div class="drive-account-icon">${account.photoLink ? `<img src="${esc(account.photoLink)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${ICONS.cloud}</span>` : ICONS.cloud}</div>` : ICONS.cloud}</div>
+          <div class="file-tool-copy"><strong>Google Drive</strong><span>${esc(info.linked ? info.syncLabel : 'Este projeto ainda não está no Google Drive')}</span><p>${info.linked ? `Arquivo: ${esc(info.driveFileName || 'projeto no Drive')}${info.lastSyncAt ? ` · última sincronização ${fmtDateTime(info.lastSyncAt)}` : ''}. O salvamento neste dispositivo é automático e independe do Drive.` : 'O Drive guarda uma cópia na nuvem. Seu trabalho continua salvo neste dispositivo, com ou sem o Drive.'}${account ? ` Conta: ${esc(account.email || account.displayName || 'Google')}.` : ''}</p></div>
           <div class="file-tool-actions">
-            <button type="button" class="btn-secondary" id="btnDriveOpen">${ICONS.folder} Abrir do Drive</button>
-            <button type="button" class="btn-primary" id="btnDriveAction" ${getDriveActionPending() ? 'disabled aria-busy="true"' : ''}>${getDriveActionPending() ? ICONS.cloud + ' Atualizando…' : (driveBindingForCurrentProject() ? ICONS.cloud + ' Atualizar Drive' : ICONS.cloud + ' Conectar e atualizar')}</button>
-            ${driveBindingForCurrentProject() ? '<button type="button" class="btn-ghost" id="btnDriveDisconnect">Desvincular</button>' : ''}
+            <button type="button" class="btn-primary" id="btnDriveSync" ${busy ? 'disabled aria-busy="true"' : ''}>${ICONS.cloud} ${busy ? 'Sincronizando…' : (info.linked ? 'Sincronizar agora' : 'Enviar ao Google Drive')}</button>
+            ${account ? '<button type="button" class="btn-ghost" id="btnDriveAccountSettings">Conta Google</button>' : ''}
+            ${info.linked ? '<button type="button" class="btn-ghost" id="btnDriveUnlink">Desvincular</button><button type="button" class="btn-ghost danger" id="btnDriveTrash">Mover para a lixeira do Drive</button>' : ''}
+          </div>
+        </section>
+      </div>
+
+      <div class="file-tools-grid">
+        <section class="card file-tool-card">
+          <div class="file-tool-icon">${ICONS.refresh}</div>
+          <div class="file-tool-copy"><strong>Atualizar projeto com DED+</strong><span>Vários PDFs de uma vez</span><p>Turmas existentes são atualizadas, turmas novas são adicionadas e ninguém é apagado automaticamente: quem não aparece no PDF é preservado com o histórico.</p></div>
+          <button type="button" class="btn-secondary" id="btnDedProjectUpdate">${ICONS.refresh} Atualizar com DED+</button>
+        </section>
+        <section class="card file-tool-card">
+          <div class="file-tool-icon">${ICONS.file}</div>
+          <div class="file-tool-copy"><strong>Exportar e importar</strong><span>O .prg é um formato portátil</span><p>Exportar gera uma cópia do projeto para guardar ou enviar; ela não altera nem substitui o projeto neste dispositivo.</p></div>
+          <div class="file-tool-actions">
+            <button type="button" class="btn-secondary" id="btnExportPrg">${ICONS.file} Exportar .prg</button>
+            <button type="button" class="btn-secondary" id="btnSharePrg" ${supportsFileShare() ? '' : 'hidden'}>${ICONS.share || ICONS.copy} Compartilhar .prg</button>
+            <button type="button" class="btn-secondary" id="btnExportCsv">${ICONS.copy} Exportar alunos (CSV)</button>
+            <button type="button" class="btn-secondary" id="btnImportCsv">${ICONS.folder} Importar alunos (CSV)</button>
           </div>
         </section>
       </div>
 
       <details class="file-more-options">
-        <summary><span>Mais opções do arquivo</span><span class="details-hint">Exportar, compartilhar e importar</span></summary>
+        <summary><span>Remover projeto</span><span class="details-hint">Ações que apagam dados</span></summary>
         <div class="file-more-grid">
-          <button type="button" class="btn-secondary" id="btnExportPrg">${ICONS.file} Exportar cópia .prg</button>
-          <button type="button" class="btn-secondary" id="btnSharePrg" ${supportsFileShare() ? '' : 'hidden'}>${ICONS.share || ICONS.copy} Compartilhar .prg</button>
-          <button type="button" class="btn-secondary" id="btnExportCsv">${ICONS.copy} Exportar alunos (CSV)</button>
-          <button type="button" class="btn-secondary" id="btnImportCsv">${ICONS.folder} Importar alunos (CSV)</button>
+          <button type="button" class="btn-ghost danger" id="btnDeleteProject">${ICONS.trash} Excluir deste dispositivo</button>
+          ${info.linked ? `<button type="button" class="btn-ghost danger" id="btnDeleteProjectEverywhere">${ICONS.trash} Remover do dispositivo e do Google Drive</button>` : ''}
         </div>
-        <p class="file-note">Em alguns celulares, o arquivo aberto não pode ser atualizado diretamente. Nesses casos, suas alterações continuam protegidas neste dispositivo; use <strong>Exportar cópia .prg</strong> para gerar o arquivo atualizado.</p>
+        <p class="file-note">Excluir deste dispositivo remove o projeto, as cópias de segurança e a recuperação dele — mas não apaga o arquivo do Google Drive nem arquivos .prg que você exportou.</p>
       </details>
-
-      <p class="file-meta-line">Criado em ${fmtDate(getState().createdAt)} · Última alteração: ${fmtDateTime(getState().updatedAt)}</p>
       <input type="file" id="csvInput" class="visually-hidden" accept=".csv">
     `;
   }
@@ -90,15 +108,15 @@ export function createFileSettingsRenderers(deps) {
         </section>
 
         <section class="card">
-          <div class="section-title section-title-first">Arquivos e sincronização</div>
-          <p class="form-hint settings-hint">Abra projetos, acompanhe o salvamento automático, faça cópias de segurança e gerencie o Google Drive em um único lugar.</p>
-          <div class="drive-settings-status ${driveStatusTone()}">
+          <div class="section-title section-title-first">Projeto e Google Drive</div>
+          <p class="form-hint settings-hint">Seu projeto é salvo automaticamente neste dispositivo. Gerencie o nome, as cópias de segurança, a exportação .prg e o Google Drive na página do projeto.</p>
+          <div class="drive-settings-status ${getProjectInfo().tone}">
             ${getDriveAccount() ? `<div class="drive-settings-photo">${getDriveAccount().photoLink ? `<img src="${esc(getDriveAccount().photoLink)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</span>` : esc((getDriveAccount().displayName || getDriveAccount().email || 'G')[0].toUpperCase())}</div>` : `<span class="drive-settings-icon">${ICONS.cloud}</span>`}
-            <div><strong>${esc(driveStatusText())}</strong><span>${getDriveAccount() ? `${esc(getDriveAccount().displayName || 'Conta Google')} · ${esc(getDriveAccount().email || 'Conta conectada')}` : (driveBindingForCurrentProject() ? `Projeto: ${esc(driveBindingForCurrentProject().name || getCurrentFileName() || 'Projeto atual')}` : 'Google Drive opcional.')}</span></div>
+            <div><strong>${esc(getProjectInfo().linked ? getProjectInfo().syncLabel : getProjectInfo().localLabel)}</strong><span>${getDriveAccount() ? `${esc(getDriveAccount().displayName || 'Conta Google')} · ${esc(getDriveAccount().email || 'Conta conectada')}` : (getProjectInfo().linked ? `Projeto: ${esc(getProjectInfo().name)}` : 'Google Drive opcional.')}</span></div>
           </div>
           ${getDriveAccount() ? `<div class="drive-account-settings-row"><span>Conta lembrada neste dispositivo</span><button type="button" class="btn-secondary btn-sm" id="btnDriveAccountSettings">Gerenciar conta</button></div>` : ''}
           <div class="form-actions form-actions-settings">
-            <button type="button" class="btn-primary" id="btnGoFileFromSettings">${ICONS.folder} Abrir Arquivos</button>
+            <button type="button" class="btn-primary" id="btnGoFileFromSettings">${ICONS.folder} Abrir página do projeto</button>
           </div>
         </section>
 

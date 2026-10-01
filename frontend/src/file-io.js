@@ -14,19 +14,6 @@ export function isAndroidDevice(navigatorLike = globalThis.navigator) {
   return /Android/i.test(navigatorLike?.userAgent || '');
 }
 
-export function supportsNativeFilePicker(windowLike = globalThis.window, navigatorLike = globalThis.navigator) {
-  // Android browsers can expose showOpenFilePicker but still route provider
-  // backed documents through a FileSystemFileHandle implementation with
-  // inconsistent read support. The normal <input type=file> path is more
-  // reliable for .prg files on mobile. Keep the native picker on desktop.
-  if (isAndroidDevice(navigatorLike)) return false;
-  return typeof windowLike?.showOpenFilePicker === 'function';
-}
-
-export function supportsNativeSavePicker(windowLike = globalThis.window, navigatorLike = globalThis.navigator) {
-  return !isAndroidDevice(navigatorLike) && typeof windowLike?.showSaveFilePicker === 'function';
-}
-
 export async function readTextFileUtf8(file) {
   let buffer;
   try {
@@ -51,25 +38,6 @@ export async function readTextFileUtf8(file) {
     return new TextDecoder('utf-16be').decode(bytes);
   }
   return new TextDecoder('utf-8').decode(bytes);
-}
-
-export function prgOpenPickerTypes() {
-  return [{
-    description: 'ProfessorGest (.prg)',
-    accept: {
-      [PRG_MIME]: ['.prg'],
-      'application/json': ['.prg'],
-      'application/octet-stream': ['.prg'],
-      'text/plain': ['.prg']
-    }
-  }];
-}
-
-export function prgSavePickerTypes() {
-  return [{
-    description: 'ProfessorGest (.prg)',
-    accept: { [PRG_MIME]: ['.prg'] }
-  }];
 }
 
 export function supportsFileShare(navigatorLike = globalThis.navigator, FileCtor = globalThis.File) {

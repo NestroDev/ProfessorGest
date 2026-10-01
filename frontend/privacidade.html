@@ -21,7 +21,7 @@
   </div>
   <main class="card">
     <h1>Política de Privacidade</h1>
-    <p class="updated">Última atualização: 30 de setembro de 2026</p>
+    <p class="updated">Última atualização: 1 de outubro de 2026</p>
 
     <p>Esta Política de Privacidade descreve como o ProfessorGest trata informações quando você utiliza o aplicativo web para organizar turmas, alunos, atividades, ocorrências e relatórios pedagógicos.</p>
 
@@ -34,24 +34,25 @@
       <li>nomes de turmas e alunos;</li>
       <li>atividades, datas, descrições e atividades e registros pedagógicos;</li>
       <li>ocorrências, observações pedagógicas e anotações associadas aos alunos;</li>
-      <li>dados técnicos necessários para salvar e reabrir o projeto no mesmo dispositivo, como nome do arquivo e preferências do aplicativo.</li>
+      <li>dados técnicos necessários para salvar e reabrir cada projeto no mesmo dispositivo, como nome do projeto, identificador, datas e preferências do aplicativo.</li>
     </ul>
 
     <h2>2. Armazenamento no dispositivo</h2>
-    <p>Os projetos podem ser mantidos no armazenamento local do navegador, incluindo IndexedDB e armazenamento local do navegador. O ProfessorGest mantém também uma cópia de recuperação imediata e algumas cópias de segurança recentes no próprio dispositivo para ajudar a recuperar o trabalho caso uma alteração ou arquivo apresente algum problema.</p>
-    <p>O ProfessorGest também pode criar arquivos <code>.prg</code> para exportação e abertura manual. Esses arquivos são controlados por você e podem conter todos os dados do seu projeto.</p>
+    <p>O ProfessorGest armazena os projetos localmente no dispositivo, no IndexedDB do navegador. Cada projeto tem as suas próprias cópias de segurança (até 10) e a sua própria cópia de recuperação, mantidas no mesmo dispositivo para ajudar a recuperar o trabalho caso uma alteração ou arquivo apresente algum problema. O armazenamento local do navegador guarda também preferências e, como reserva temporária de recuperação, um rascunho do projeto aberto.</p>
+    <p><code>.prg</code> é um formato portátil para importação e exportação. Quando você exporta, o ProfessorGest gera um arquivo <code>.prg</code> que é controlado por você e pode conter todos os dados do projeto; exportar não altera o projeto salvo no dispositivo. Ao importar um <code>.prg</code>, o projeto passa a ser armazenado no dispositivo.</p>
 
     <h2>3. Google Drive e dados obtidos do Google</h2>
-    <p>A integração com o Google Drive é opcional. Quando você escolhe abrir ou salvar um projeto no Google Drive, o ProfessorGest pede ao Google a autorização necessária para trabalhar com os arquivos que você escolher.</p>
+    <p>Google Drive é uma opção de armazenamento/sincronização em nuvem. A integração é opcional. Quando você a utiliza, o ProfessorGest pede ao Google apenas a permissão <code>drive.file</code>, que dá acesso somente aos arquivos que o próprio ProfessorGest criou ou que você abriu por meio do seletor do Google. O aplicativo não tem acesso aos demais arquivos do seu Drive.</p>
     <p>Nessa situação, o aplicativo pode:</p>
     <ul>
-      <li>permitir que você selecione, no seu próprio Google Drive, um arquivo de projeto usado pelo ProfessorGest;</li>
-      <li>ler o conteúdo do arquivo selecionado para abrir o projeto;</li>
-      <li>criar um novo arquivo de projeto no seu Google Drive quando você escolher salvá-lo ali;</li>
-      <li>atualizar o arquivo de projeto vinculado somente quando você solicitar explicitamente essa atualização.</li>
+      <li>criar no seu Google Drive um arquivo para cada projeto que você escolher enviar, identificado por propriedades privadas do aplicativo (identificador do projeto, formato e versão);</li>
+      <li>atualizar esse arquivo com a versão do projeto, quando você pedir a sincronização ou, em projetos já vinculados e enquanto a autorização estiver ativa no aparelho, de forma automática para enviar alterações pendentes;</li>
+      <li>listar os arquivos do ProfessorGest que ele tem permissão de ver e permitir que você os adicione ao dispositivo;</li>
+      <li>permitir que você selecione, pelo seletor do Google, um arquivo de projeto <code>.prg</code> e importá-lo;</li>
+      <li>mover o arquivo para a lixeira do Drive, somente quando você pedir.</li>
     </ul>
-    <p>O conteúdo do projeto é enviado ao Google Drive somente como parte de uma ação que você inicia, como abrir, criar ou atualizar um arquivo. Depois que um projeto é alterado, o ProfessorGest não envia essas alterações ao Drive automaticamente: ele apenas informa que existe uma atualização pendente para você decidir quando enviá-la. O ProfessorGest não utiliza os dados do Google Drive para publicidade, não os vende e não os utiliza para criação de perfis de publicidade.</p>
-    <p>O token de acesso recebido para a sessão do Google Drive não é gravado no arquivo <code>.prg</code> nem no armazenamento local do aplicativo. O aplicativo mantém localmente apenas os metadados necessários para reconhecer o arquivo vinculado, como identificador, nome, data de alteração e horário da última sincronização.</p>
+    <p>Quando o arquivo no Drive e o projeto local divergem, o ProfessorGest não mescla nem sobrescreve em silêncio: você escolhe qual versão manter, e uma cópia de segurança é criada antes de qualquer substituição local. Desvincular um projeto do Drive remove apenas o vínculo e não exclui o arquivo nem o projeto. O ProfessorGest não utiliza os dados do Google Drive para publicidade, não os vende e não os utiliza para criação de perfis de publicidade.</p>
+    <p>O token de acesso do Google fica apenas na memória da sessão e não é gravado no <code>.prg</code> nem no armazenamento do aplicativo. O aplicativo lembra neste dispositivo somente a identificação da conta (nome, e-mail, foto e identificador de permissão) e, em cada projeto vinculado, os metadados do arquivo: identificador, nome, data de alteração e horário da última sincronização. Você pode remover a conta lembrada a qualquer momento.</p>
 
     <h2>4. Seus projetos não ficam em um servidor do ProfessorGest</h2>
     <p>O ProfessorGest não mantém um servidor próprio para guardar seus projetos. O trabalho principal acontece no seu dispositivo. Quando você usa o Google Drive, a cópia em nuvem fica nos serviços do Google e segue as políticas do Google.</p>
@@ -64,13 +65,13 @@
 
     <h2>7. Dados de alunos e responsabilidade do usuário</h2>
     <p>O ProfessorGest permite registrar dados pessoais e observações pedagógicas de alunos, inclusive informações que podem exigir cuidados especiais conforme a legislação aplicável. Você é responsável por utilizar o aplicativo de forma adequada, inserir apenas os dados necessários e observar as bases legais, autorizações, deveres de sigilo e demais requisitos aplicáveis ao seu contexto escolar.</p>
-    <p>Como os projetos podem permanecer apenas no dispositivo ou na conta do Google Drive escolhida por você, é importante proteger o dispositivo, a conta Google e os arquivos exportados contra acesso não autorizado.</p>
+    <p>Como os projetos permanecem no dispositivo e, se você optar, na conta do Google Drive escolhida por você, é importante proteger o dispositivo, a conta Google e os arquivos exportados contra acesso não autorizado.</p>
 
     <h2>8. Compartilhamento com terceiros</h2>
     <p>O ProfessorGest não possui mecanismo próprio para vender ou compartilhar os projetos com terceiros. Quando você opta por utilizar o Google Drive, os dados necessários à operação são processados pelos serviços do Google. Recursos externos carregados pela página, como fontes da web, seguem as políticas dos respectivos provedores.</p>
 
     <h2>9. Exclusão</h2>
-    <p>Como os projetos são armazenados localmente ou em arquivos sob seu controle, você pode excluir a cópia local pelos mecanismos de armazenamento do navegador, excluir o arquivo <code>.prg</code> exportado no seu dispositivo e remover do Google Drive as cópias que você criou. A exclusão de dados armazenados por terceiros, como o Google, segue as ferramentas e políticas desses terceiros.</p>
+    <p>Você pode excluir um projeto do dispositivo pelo próprio aplicativo; isso remove também as cópias de segurança e a recuperação desse projeto, mas não apaga o arquivo do Google Drive nem arquivos <code>.prg</code> que você exportou. Para remover o arquivo do Drive, use a ação de mover para a lixeira (ou remover dos dois lugares), ou o próprio Google Drive. A opção "Apagar todos os dados deste dispositivo" remove todos os projetos, cópias, recuperações, a conta lembrada e as preferências. A exclusão de dados armazenados por terceiros, como o Google, segue as ferramentas e políticas desses terceiros.</p>
 
     <h2>10. Alterações nesta política</h2>
     <p>Esta política pode ser atualizada para refletir mudanças no aplicativo, nos serviços integrados ou nas obrigações aplicáveis. A data de atualização será alterada quando uma nova versão for publicada.</p>

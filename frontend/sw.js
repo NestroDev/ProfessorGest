@@ -1,4 +1,4 @@
-const CACHE_NAME = 'professorgest-shell-v65-entry-flow';
+const CACHE_NAME = 'professorgest-shell-v66-projects';
 const APP_SHELL = [
   './',
   './index.html',
@@ -7,8 +7,10 @@ const APP_SHELL = [
   './app.js',
   './api-config.js',
   './src/prof-model.js',
-  './src/local-store.js',
-  './src/drive-bindings.js',
+  './src/project-store.js',
+  './src/prg-transfer.js',
+  './src/drive-sync.js',
+  './src/ded-project.js',
   './src/drive-account.js',
   './src/file-io.js',
   './src/drive-http.js',
@@ -23,7 +25,7 @@ const APP_SHELL = [
   './src/views-reports.js',
   './src/views-class.js',
   './src/views-file-settings.js',
-  './src/views-welcome.js',
+  './src/views-projects.js',
   './src/views-planning.js',
   './src/services/api-client.js',
   './src/ded-parser.js',

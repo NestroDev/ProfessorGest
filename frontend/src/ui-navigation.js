@@ -25,7 +25,7 @@ export function createNavigationController({
   closeCommandPalette,
   openModal,
   closeModal,
-  driveBindingForCurrentProject,
+  driveLinkForCurrentProject,
 }) {
   let initialized = false;
   let restoring = false;
@@ -245,7 +245,7 @@ export function createNavigationController({
     const state = getState();
     const teacherName = state?.teacher?.name?.trim() || 'Professor(a)';
     const school = '';
-    const driveConnected = !!driveBindingForCurrentProject();
+    const driveConnected = !!driveLinkForCurrentProject();
     const driveLabel = driveConnected ? 'Google Drive conectado' : 'Google Drive disponível';
     const mobileGroups = [
       { label: 'Aulas', keys: ['planejamento', 'calendario', 'atividades'] },
