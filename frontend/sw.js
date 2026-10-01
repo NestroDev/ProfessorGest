@@ -1,4 +1,4 @@
-const CACHE_NAME = 'professorgest-shell-v64-drive-manual';
+const CACHE_NAME = 'professorgest-shell-v65-entry-flow';
 const APP_SHELL = [
   './',
   './index.html',

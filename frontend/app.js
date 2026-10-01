@@ -37,7 +37,7 @@ import { normalizeDedStudentName, normalizeDedClassKey, sameDedClassIdentity, no
    usuário; a API é opcional e fica isolada pelo cliente central.
 ================================================================= */
 
-const APP_BUILD = '2026.10.01.6-drive-manual-only';
+const APP_BUILD = '2026.10.01.7-entry-flow';
 const DEV_LOG_KEY = 'professorgest-dev-log-v2';
 const DEV_LOG_LEGACY_KEYS = ['professorgest-dev-log-v1'];
 const DEV_LOG_MAX_ENTRIES = 50;
@@ -1043,19 +1043,69 @@ function updateWelcomeExperience(returningUser) {
   const title = document.querySelector('.welcome-content-minimal h1');
   const lead = document.querySelector('.welcome-content-minimal .welcome-lead');
   updateWelcomeAccountControl();
-  if (!screen || !newFile || !openFile) return;
+  if (!screen) return;
+  newFile?.classList.toggle('primary', !returningUser);
+  openFile?.classList.toggle('primary', !!returningUser);
   screen.classList.toggle('welcome-returning', !!returningUser);
-  newFile.classList.toggle('primary', !returningUser);
-  openFile.classList.toggle('primary', !!returningUser);
   if (returningUser) {
     if (title) title.textContent = 'Continue seu trabalho.';
     if (lead) lead.textContent = 'Abra um arquivo existente ou comece um novo.';
-    openFile.querySelector('.welcome-card-copy strong')?.replaceChildren(document.createTextNode('Abrir meu arquivo'));
   } else {
     if (title) title.textContent = 'Vamos começar.';
-    if (lead) lead.textContent = 'Abra seu arquivo ou crie um novo espaço de trabalho.';
-    openFile.querySelector('.welcome-card-copy strong')?.replaceChildren(document.createTextNode('Abrir arquivo'));
+    if (lead) lead.textContent = 'Abra um arquivo existente ou crie um novo.';
   }
+}
+
+function openWelcomeNewFileChooser() {
+  openModal(`
+    <div class="modal-title">Como deseja começar?</div>
+    <p class="confirm-body">Escolha uma forma de criar seu novo arquivo. Você poderá editar e salvar normalmente depois.</p>
+    <div class="choice-grid">
+      <button type="button" class="choice-card primary" id="welcomeChoiceBlank">
+        <span class="choice-card-icon" aria-hidden="true">${ICONS.plus}</span>
+        <span><strong>Começar do zero</strong><small>Criar um projeto vazio e preencher as informações manualmente.</small></span>
+      </button>
+      <button type="button" class="choice-card" id="welcomeChoiceDed">
+        <span class="choice-card-icon" aria-hidden="true">${ICONS.file}</span>
+        <span><strong>Usar o DED+</strong><small>Importar uma ou várias turmas a partir dos arquivos do DED+.</small></span>
+      </button>
+    </div>
+    <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button></div>
+  `);
+  document.getElementById('welcomeChoiceBlank')?.addEventListener('click', () => {
+    closeModal();
+    beginNewProjectSetup(false);
+  });
+  document.getElementById('welcomeChoiceDed')?.addEventListener('click', () => {
+    closeModal();
+    openDedNewProjectModal();
+  });
+}
+
+function openWelcomeFileChooser() {
+  openModal(`
+    <div class="modal-title">De onde deseja abrir?</div>
+    <p class="confirm-body">Escolha onde está o arquivo de projeto que você quer carregar no ProfessorGest.</p>
+    <div class="choice-grid">
+      <button type="button" class="choice-card primary" id="welcomeChoiceLocalFile">
+        <span class="choice-card-icon" aria-hidden="true">${ICONS.folder}</span>
+        <span><strong>Neste dispositivo</strong><small>Abrir um arquivo <code>.prg</code> salvo no seu computador ou celular.</small></span>
+      </button>
+      <button type="button" class="choice-card" id="welcomeChoiceDriveFile">
+        <span class="choice-card-icon" aria-hidden="true">${ICONS.cloud}</span>
+        <span><strong>Google Drive</strong><small>Selecionar um arquivo <code>.prg</code> armazenado na sua conta Google.</small></span>
+      </button>
+    </div>
+    <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button></div>
+  `);
+  document.getElementById('welcomeChoiceLocalFile')?.addEventListener('click', () => {
+    closeModal();
+    openFile();
+  });
+  document.getElementById('welcomeChoiceDriveFile')?.addEventListener('click', () => {
+    closeModal();
+    openDrivePicker();
+  });
 }
 
 
@@ -1308,6 +1358,32 @@ function invalidateDriveSession({ forgetAccount = false, refreshUI = true } = {}
   }
 }
 
+function connectGoogleDriveAccount() {
+  if (!isGoogleDriveConfigured()) {
+    showDriveNotConfigured();
+    return false;
+  }
+  requestDriveAccessTokenFromClick({
+    forceConsent: false,
+    onToken: async () => {
+      try {
+        await refreshDriveAccountProfile();
+        toast(driveAccount ? `Conta Google conectada: ${driveAccount.email || driveAccountLabel()}.` : 'Conta Google conectada.', 'success');
+      } catch (err) {
+        toast(err?.message || 'A conta foi autorizada, mas não foi possível carregar o perfil do Google.', 'error');
+      } finally {
+        updateWelcomeAccountControl();
+      }
+    },
+    onError: (err) => {
+      if (!isDriveAuthCancellationError(err)) {
+        toast(err?.message || 'Não foi possível conectar a conta Google.', 'error');
+      }
+    },
+  });
+  return true;
+}
+
 function switchDriveAccount() {
   if (!isGoogleDriveConfigured()) { showDriveNotConfigured(); return false; }
   const previousAccount = driveAccount;
@@ -1341,7 +1417,7 @@ function switchDriveAccount() {
 }
 
 function openDriveAccountSettings() {
-  if (!driveAccount) { openDrivePicker(); return; }
+  if (!driveAccount) { connectGoogleDriveAccount(); return; }
   openModal(`
     <div class=\"drive-account-modal-head\">
       ${driveAccountAvatarHTML({ className: 'drive-account-avatar-xl' })}
@@ -2719,15 +2795,17 @@ window.addEventListener('pagehide', () => { if (isDirty) persistLocalRecoveryDra
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && isDirty) persistLocalRecoveryDraft(); });
 
 function bindGlobalEvents() {
-  document.getElementById('welcomeNewFile').onclick = () => beginNewProjectSetup(false);
-  document.getElementById('welcomeNewFromDed')?.addEventListener('click', () => openDedNewProjectModal());
-  document.getElementById('welcomeOpenFile').onclick = () => openFile();
+  document.getElementById('welcomeNewFile').onclick = () => openWelcomeNewFileChooser();
+  document.getElementById('welcomeOpenFile').onclick = () => openWelcomeFileChooser();
   document.getElementById('welcomeAccountControl')?.addEventListener('click', () => {
     if (driveAccount) openDriveAccountSettings();
-    else openDrivePicker();
+    else connectGoogleDriveAccount();
   });
   document.getElementById('welcomeDemo').onclick = () => beginDemoMode();
-  document.getElementById('welcomeDrive')?.addEventListener('click', openDrivePicker);
+  document.getElementById('welcomeDrive')?.addEventListener('click', () => {
+    if (driveAccount) openDriveAccountSettings();
+    else connectGoogleDriveAccount();
+  });
   document.getElementById('welcomeBackups')?.addEventListener('click', () => openBackupsModal({ global: true }));
   document.getElementById('welcomeSettings')?.addEventListener('click', () => openWelcomeSettingsModal());
   document.getElementById('welcomeInstall')?.addEventListener('click', promptInstall);

@@ -179,6 +179,19 @@ test('limite de tamanho do .prg é aplicado', () => {
   assert.equal(result.error, 'size');
 });
 
+test('tela inicial separa criar/abrir em escolhas e login Google não abre o Picker', () => {
+  assert.doesNotMatch(indexSource, /id=\"welcomeNewFromDed\"/);
+  assert.match(indexSource, /id=\"welcomeNewFile\"/);
+  assert.match(indexSource, /id=\"welcomeOpenFile\"/);
+  assert.match(appSource, /function openWelcomeNewFileChooser\(\)/);
+  assert.match(appSource, /function openWelcomeFileChooser\(\)/);
+  assert.match(appSource, /function connectGoogleDriveAccount\(\)/);
+  assert.match(appSource, /else connectGoogleDriveAccount\(\)/);
+  assert.doesNotMatch(appSource, /if \(!driveAccount\) \{ openDrivePicker\(\); return; \}/);
+  assert.match(appSource, /welcomeChoiceDed/);
+  assert.match(appSource, /welcomeChoiceDriveFile/);
+});
+
 test('conta Google lembrada persiste apenas identidade e normaliza os dados', () => {
   assert.equal(DRIVE_ACCOUNT_KEY, 'professorgest-drive-account-v1');
   const storage = { data: new Map(), getItem(key) { return this.data.get(key) ?? null; }, setItem(key, value) { this.data.set(key, value); }, removeItem(key) { this.data.delete(key); } };
@@ -235,6 +248,15 @@ test('versões locais são tratadas como cache limitado e podem ser limpas sem a
   assert.match(appSource, /As versões locais foram removidas/);
   assert.match(appSource, /Seus arquivos \.prg não foram alterados/);
   assert.match(appSource, /Limite local: 4 projetos/);
+});
+
+test('políticas legais descrevem o comportamento manual atual do Google Drive', () => {
+  const privacySource = fs.readFileSync(path.join(root, 'frontend', 'privacidade.html'), 'utf8');
+  const termsSource = fs.readFileSync(path.join(root, 'frontend', 'termos.html'), 'utf8');
+  assert.doesNotMatch(privacySource, /sincronização automática/i);
+  assert.match(privacySource, /não envia essas alterações ao Drive automaticamente/i);
+  assert.match(termsSource, /As atualizações de um projeto já vinculado ao Drive são manuais/i);
+  assert.match(termsSource, /não realiza atualizações automáticas em segundo plano/i);
 });
 
 test('CSS possui apenas um tema claro canônico e um dark canônico', () => {
@@ -396,7 +418,7 @@ test('armazenamento local impede que gravações antigas terminem por cima de ve
 });
 
 test('service worker inclui os módulos e não ativa atualização durante install', () => {
-  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v64-drive-manual'/);
+  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v65-entry-flow'/);
   assert.match(swSource, /\.\/api-config\.js/);
   assert.match(swSource, /\.\/src\/prof-model\.js/);
   assert.match(swSource, /\.\/src\/local-store\.js/);
