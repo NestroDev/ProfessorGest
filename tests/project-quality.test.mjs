@@ -162,7 +162,7 @@ test('conta Google lembrada persiste apenas identidade e normaliza os dados', ()
 test('CSS possui apenas um tema claro canônico e um dark canônico', () => {
   assert.equal((cssSource.match(/^:root\{/gm) || []).length, 1);
   assert.equal((cssSource.match(/^html\[data-theme="dark"\]\{/gm) || []).length, 1);
-  assert.match(cssSource, /--primary:#2563EB/);
+  assert.match(cssSource, /--primary:\s*#3A5A8C/);
 });
 
 test('planejamento é opcional e compatível com projetos atuais', () => {
@@ -226,10 +226,10 @@ test('overlays de erro ficam fora do app para funcionar na tela inicial', () => 
 });
 
 test('service worker inclui os módulos e não ativa atualização durante install', () => {
-  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v66-projects'/);
+  assert.match(swSource, /CACHE_NAME = 'professorgest-shell-v70-palette'/);
   assert.match(swSource, /\.\/api-config\.js/);
   assert.match(swSource, /\.\/src\/prof-model\.js/);
-  for (const mod of ['project-store', 'prg-transfer', 'drive-sync', 'ded-project', 'views-projects']) {
+  for (const mod of ['project-store', 'prg-transfer', 'drive-sync', 'ded-project', 'views-projects', 'grade-recommendation']) {
     assert.match(swSource, new RegExp(`\\./src/${mod}\\.js`));
   }
   assert.doesNotMatch(swSource, /local-store|drive-bindings|views-welcome/);
@@ -435,7 +435,7 @@ test('views de calendário e ocorrências estão fora do app monolítico', async
     searchFieldHTML: (id, placeholder, value = '') => `<div class=\"search-field\"><input id=\"${id}\" placeholder=\"${placeholder}\" value=\"${value}\"></div>`
   });
   assert.match(views.renderCalendario(), /Calendário/);
-  assert.match(views.renderOcorrenciasLog(), /Ocorrências/);
+  assert.match(views.renderOcorrenciasLog(), /<h1>Registros<\/h1>/);
 });
 
 
@@ -484,7 +484,7 @@ test('views preservam estado reatribuído por getters', async () => {
   info = { ...info, linked: true, syncLabel: 'Alterações pendentes no Drive', driveFileName: 'segundo.prg' };
   const linked = views.renderArquivo();
   assert.match(linked, /Sincronizar agora/);
-  assert.match(linked, /Desvincular/);
+  assert.match(linked, /Desconectar do Drive/);
   assert.match(linked, /btnDeleteProjectEverywhere/);
 });
 test('view de turma está fora do app monolítico', async () => {
@@ -697,7 +697,7 @@ test('pesquisa global possui botão explícito de fechamento também no mobile',
 test('botão de pesquisa mobile mantém a mesma linguagem do botão de desktop', () => {
   assert.match(indexSource, /class=\"topbar-search\"[\s\S]*?topbar-search-label/);
   assert.match(cssSource, /\.topbar-search-label/);
-  assert.match(cssSource, /@media \(max-width: 860px\)[\s\S]*?\.topbar-search \{ width: 82px;/);
+  assert.match(cssSource, /@media \(max-width: 860px\)[\s\S]*?\.topbar-search \{ width: 110px;/);
 });
 
 test('pesquisa global é um overlay fixo e não participa do fluxo da página', () => {

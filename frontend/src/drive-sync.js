@@ -276,6 +276,28 @@ export async function syncProject(store, api, projectId, { account = null, force
   }
 }
 
+/**
+ * Só consulta os metadados do arquivo no Drive (nada é enviado) — usado ao abrir um projeto
+ * para descobrir se existe uma versão mais nova. Nunca lança por falha do Drive.
+ */
+export async function checkRemoteVersion(store, api, projectId, { account = null, online } = {}) {
+  const meta = await store.getProjectMeta(projectId);
+  const link = meta?.driveLink;
+  if (!link) return { status: SYNC_STATUS.LOCAL_ONLY };
+  if (linkMismatch(link, account)) return { status: SYNC_STATUS.RECONNECT, reason: 'account-mismatch' };
+  try {
+    const remote = await api.getMeta(link.fileId);
+    if (remote.trashed) { await store.markRemoteMissing(projectId); return { status: SYNC_STATUS.REMOTE_MISSING, remote }; }
+    const pending = isDrivePending(meta);
+    if (isRemoteNewer(link, remote.modifiedTime)) return { status: pending ? SYNC_STATUS.CONFLICT : SYNC_STATUS.REMOTE_NEWER, remote };
+    return { status: pending ? SYNC_STATUS.PENDING : SYNC_STATUS.SYNCED, remote };
+  } catch (error) {
+    const kind = classifyDriveError(error, { online });
+    if (kind === 'notfound') await store.markRemoteMissing(projectId).catch(() => {});
+    return { status: statusForError(kind) || SYNC_STATUS.PENDING, error: kind, message: error?.message || '' };
+  }
+}
+
 async function fetchRemoteProject(api, fileId, expectedProjectId = null) {
   const remote = await api.getMeta(fileId);
   if (remote.trashed) throw new DriveError('notfound', 'O arquivo está na lixeira do Google Drive.', 404);

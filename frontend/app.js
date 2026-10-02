@@ -9,8 +9,9 @@ import { exportProjectPrg, readPrgFile, prgFileNameForProject } from './src/prg-
 import {
   SYNC_STATUS, DriveError, DRIVE_SCOPE, createDriveApi, discoverDriveProjects, mergeProjectLists, computeSyncStatus, syncLabel,
   syncProject, resolveConflictKeepLocal, resolveConflictUseRemote, pullRemoteIfNewer, addDriveProjectToDevice,
-  trashProjectOnDrive, removeFromDeviceAndDrive, unlinkProjectFromDrive, classifyDriveError, isRemoteNewer,
+  trashProjectOnDrive, removeFromDeviceAndDrive, unlinkProjectFromDrive, classifyDriveError, isRemoteNewer, checkRemoteVersion,
 } from './src/drive-sync.js';
+import { OCCURRENCE_TYPES, OCCURRENCE_POLARITIES, DEFAULT_GRADE_SETTINGS, normalizeGradeSettings, recommendGrade, formatGrade, formatPoints } from './src/grade-recommendation.js';
 import { projectsListHTML, cloudAccountSummary, statusTone, needsAttention } from './src/views-projects.js';
 import { previewDedProjectUpdate } from './src/ded-project.js';
 import { supportsFileShare, downloadTextFile } from './src/file-io.js';
@@ -24,10 +25,10 @@ import { createModalController } from './src/ui-modal.js';
 import { createStudentActivityRenderers } from './src/views-students-activities.js';
 import { createCalendarOccurrenceRenderers } from './src/views-calendar-occurrences.js';
 import { createReportRenderers } from './src/views-reports.js';
-import { createFileSettingsRenderers } from './src/views-file-settings.js';
+import { createFileSettingsRenderers, themeChoicesHTML } from './src/views-file-settings.js';
 import { createClassViewRenderers } from './src/views-class.js';
 import { createPlanningViewRenderer } from './src/views-planning.js';
-import { studentsOf as selectStudentsOf, occurrencesOf as selectOccurrencesOf, activitiesOf as selectActivitiesOf, plansOf as selectPlansOf, assignmentsOf as selectAssignmentsOf, assignmentById as selectAssignmentById, schoolById as selectSchoolById, classById as selectClassById, studentById as selectStudentById, activeClasses as selectActiveClasses, activeStudents as selectActiveStudents, activeActivities as selectActiveActivities, studentStats as selectStudentStats, classStats as selectClassStats, activityStats as selectActivityStats, activityStatus as selectActivityStatus, classIdsOfStudent as selectClassIdsOfStudent } from './src/project-selectors.js';
+import { studentsOf as selectStudentsOf, occurrencesOf as selectOccurrencesOf, activitiesOf as selectActivitiesOf, plansOf as selectPlansOf, assignmentsOf as selectAssignmentsOf, assignmentById as selectAssignmentById, schoolById as selectSchoolById, classById as selectClassById, studentById as selectStudentById, activeClasses as selectActiveClasses, activeStudents as selectActiveStudents, activeActivities as selectActiveActivities, studentStats as selectStudentStats, classStats as selectClassStats, activityStats as selectActivityStats, activityStatus as selectActivityStatus, classIdsOfStudent as selectClassIdsOfStudent, emptySchoolIds } from './src/project-selectors.js';
 import { parseDedPdfFiles } from './src/ded-pdf.js';
 import { createSearchField, createEntityPickerOption, createEntityPickerEmpty } from './src/ui-search.js';
 import { normalizeDedClassKey, normalizeExistingDedData } from './src/ded-parser.js';
@@ -199,23 +200,17 @@ let ctx = {
   histFilter: 'todos', histMonth: '',
   studentSearch: '', studentClassFilter: '', studentSort: 'nome',
   activityFilter: 'proximas', activityClassFilter: '',
-  occSearch: '', occClassFilter: '', occTypeFilter: '', occMonth: '',
+  occSearch: '', occClassFilter: '', occTypeFilter: '', occPolarityFilter: '', occMonth: '',
   calMonth: todayYM(), calSelectedDay: null, calClassFilter: '',
   bulkMode: false, bulkSelected: new Set(), bulkContext: null,
   assignmentId: null, reportStudentId: null, reportFrom: '', reportTo: '', reportOpts: null, reportSynthesis: '',
   classReportId: null, classReportFrom: '', classReportTo: '',
   classSearch: '', classComponentFilter: '', classSchoolFilter: '', classYearFilter: '', activitySearch: '',
   planningSearch: '', planningClassFilter: '', planningFrom: '', planningTo: '',
+  gradeFrom: '', gradeTo: '',
 };
 
-const OCCUR_TYPES = [
-  { key: 'nao_atividade',     label: 'Não fez atividade',        tone: 'red' },
-  { key: 'conversou',         label: 'Conversou durante a aula',  tone: 'amber' },
-  { key: 'faltou',            label: 'Faltou',                    tone: 'gray' },
-  { key: 'participou',        label: 'Participou da aula',        tone: 'green' },
-  { key: 'bom_comportamento', label: 'Bom comportamento',         tone: 'green' },
-  { key: 'observacao',        label: 'Outra observação',          tone: 'blue' },
-];
+const OCCUR_TYPES = OCCURRENCE_TYPES;
 
 const NAV_GROUPS = [
   { label: 'Início', items: [
@@ -281,6 +276,9 @@ const ICONS = {
   pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5M9 15v-3h1.5a1 1 0 010 2H9M13 12v3h1.2a1.4 1.4 0 000-3H13M17 12v3M17 13.3h1.4"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+  dot: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>',
   alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 17a1.6 1.6 0 001.4 2.4h16.2a1.6 1.6 0 001.4-2.4L13.7 3.9a1.6 1.6 0 00-2.8 0z"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M20 11a8 8 0 0 0-14.9-3.8L3 10"/><path d="M3 5v5h5"/><path d="M4 13a8 8 0 0 0 14.9 3.8L21 14"/><path d="M21 19v-5h-5"/></svg>',
@@ -511,7 +509,7 @@ function handleProjectRemovedElsewhere(projectId) {
     <p class="confirm-body">“${esc(state?.name || 'O projeto')}” foi excluído em outra janela ou aba do ProfessorGest. Suas últimas alterações ainda estão abertas aqui. Escolha o que fazer:</p>
     <div class="choice-grid">
       <button type="button" class="choice-card primary" id="removedRestore"><span><strong>Restaurar este projeto</strong><small>Salva de novo, neste dispositivo, a versão que está aberta agora.</small></span></button>
-      <button type="button" class="choice-card" id="removedExport"><span><strong>Exportar uma cópia .prg e fechar</strong><small>Guarda a versão aberta em um arquivo e volta para Seus projetos, sem recriar o projeto.</small></span></button>
+      <button type="button" class="choice-card" id="removedExport"><span><strong>Exportar o arquivo do projeto e fechar</strong><small>Guarda a versão aberta em um arquivo e volta para Seus projetos, sem recriar o projeto.</small></span></button>
       <button type="button" class="choice-card" id="removedDiscard"><span><strong>Descartar e fechar</strong><small>Fecha sem salvar. O projeto continua excluído.</small></span></button>
     </div>
   `);
@@ -655,6 +653,7 @@ async function applyProject(record, { navigateToDashboard = true, recovered = fa
   if (!validated.ok) { toast('Este projeto contém dados inválidos e não pôde ser aberto.', 'error'); return false; }
   const normalized = normalizeExistingDedData(validated.data);
   state = normalized.data;
+  pruneEmptySchools(); // escolas órfãs de versões anteriores; a limpeza vai junto no próximo salvamento
   currentMeta = record.meta;
   demoMode = false;
   isDirty = false;
@@ -690,7 +689,15 @@ function askRecoveryChoice(name) {
   });
 }
 
-async function openProject(projectId, { navigateToDashboard = true, interactive = true } = {}) {
+async function openProject(projectId, options = {}) {
+  // O token é pedido ainda no clique (preserva o gesto do usuário) para checar a versão do Drive.
+  const driveTokenPromise = options.interactive === false ? null : requestDriveTokenForOpen(projectId);
+  const opened = await loadProject(projectId, options);
+  if (opened) checkDriveVersionOnOpen(projectId, driveTokenPromise).catch(err => logError('drive-open-check', err));
+  return opened;
+}
+
+async function loadProject(projectId, { navigateToDashboard = true, interactive = true } = {}) {
   if (!projectId) return false;
   if (state && workspaceReady && !demoMode && isDirty) await flushLocalSave();
   const record = await projectStore.getProject(projectId);
@@ -720,6 +727,7 @@ async function reloadOpenProject() {
   const validated = validateProjectData(record.state);
   if (!validated.ok) return false;
   state = normalizeExistingDedData(validated.data).data;
+  pruneEmptySchools();
   currentMeta = record.meta;
   isDirty = false;
   dirtyRevision += 1;
@@ -791,7 +799,7 @@ function openNewProjectChooser({ fromWorkspace = false } = {}) {
     <div class="choice-grid">
       <button type="button" class="choice-card primary" id="chooseDed"><span><strong>Importar do DED+ <em class="choice-tag">mais rápido</em></strong><small>Selecione um ou vários PDFs de lista nominal. O projeto já nasce com escola, turmas, componentes e alunos.</small></span></button>
       <button type="button" class="choice-card" id="chooseBlank"><span><strong>Projeto em branco</strong><small>Informe seu nome e o nome do projeto e cadastre turmas e alunos manualmente.</small></span></button>
-      <button type="button" class="choice-card" id="chooseImport"><span><strong>Abrir um arquivo .prg</strong><small>Importe um projeto exportado antes, de outro aparelho ou de um backup.</small></span></button>
+      <button type="button" class="choice-card" id="chooseImport"><span><strong>Abrir um arquivo de projeto</strong><small>Importe um projeto exportado antes, de outro aparelho ou de um backup.</small></span></button>
     </div>
     <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button></div>
   `);
@@ -872,7 +880,7 @@ async function openBackupsModal(projectId = state?.projectId) {
   });
   onClick('#btnClearBackupsModal', () => confirmModal({
     title: `Limpar ${plural(backups.length, 'cópia', 'cópias')} deste projeto?`,
-    body: 'Apenas as cópias de segurança deste projeto serão removidas. O projeto, os arquivos .prg exportados e o Google Drive não serão alterados.',
+    body: 'Apenas as cópias de segurança deste projeto serão removidas. O projeto, os arquivos exportados e o Google Drive não serão alterados.',
     confirmLabel: 'Limpar cópias', danger: true,
     onConfirm: async () => { await projectStore.clearBackups(projectId); toast('As cópias deste projeto foram removidas.', 'success'); },
   }));
@@ -912,7 +920,7 @@ async function handlePrgImportInput(event) {
 
 async function importPrgFile(file) {
   let parsed;
-  try { parsed = await withAppLoading('Lendo o arquivo .prg...', () => readPrgFile(file)); }
+  try { parsed = await withAppLoading('Abrindo o arquivo…', () => readPrgFile(file)); }
   catch (err) { logError('import.read_failed', err); showFileErrorModal('Não foi possível ler o arquivo selecionado.'); return; }
   if (!parsed.ok) { showFileErrorModal(parsed.message); return; }
   const inspect = await projectStore.inspectImport(parsed.data);
@@ -981,10 +989,10 @@ async function exportProject(projectId, { share = false } = {}) {
     if (!payload) { toast('Projeto não encontrado.', 'error'); return false; }
     const result = await exportProjectPrg(payload, { share });
     if (!result.ok) {
-      toast('O compartilhamento de arquivos não está disponível neste navegador. Use Exportar .prg.', 'info');
+      toast('Este aparelho não permite compartilhar arquivos daqui. Use “Exportar arquivo do projeto”.', 'info');
       return false;
     }
-    toast(share ? 'Arquivo .prg compartilhado.' : `Arquivo ${result.filename} gerado. O projeto continua salvo neste dispositivo.`, 'success');
+    toast(share ? 'Arquivo do projeto compartilhado.' : `Arquivo ${result.filename} gerado. O projeto continua salvo neste dispositivo.`, 'success');
     return true;
   } catch (err) {
     logError('export.failed', err, { projectId });
@@ -1018,13 +1026,13 @@ async function openProjectActions(projectId) {
         ${hasRecovery ? '<button type="button" class="btn-secondary" data-pa="discard-recovery">Descartar recuperação</button>' : ''}
       </section>
       <section class="pa-group"><h4>Exportar</h4>
-        <button type="button" class="btn-secondary" data-pa="export">Exportar .prg</button>
-        ${supportsFileShare() ? '<button type="button" class="btn-secondary" data-pa="share">Compartilhar .prg</button>' : ''}
+        <button type="button" class="btn-secondary" data-pa="export">Exportar arquivo do projeto</button>
+        ${supportsFileShare() ? '<button type="button" class="btn-secondary" data-pa="share">Compartilhar arquivo do projeto</button>' : ''}
       </section>
       <section class="pa-group"><h4>Google Drive</h4>
         <button type="button" class="btn-secondary" data-pa="sync">${link ? 'Sincronizar agora' : 'Enviar ao Google Drive'}</button>
         ${canLinkRemote ? '<button type="button" class="btn-secondary" data-pa="link-remote">Vincular ao arquivo do Google Drive</button>' : ''}
-        ${link ? '<button type="button" class="btn-ghost" data-pa="unlink">Desvincular</button><button type="button" class="btn-ghost danger" data-pa="trash">Mover arquivo para a lixeira do Drive</button>' : ''}
+        ${link ? '<button type="button" class="btn-ghost" data-pa="unlink">Desconectar do Drive</button><button type="button" class="btn-ghost danger" data-pa="trash">Mover arquivo para a lixeira do Drive</button>' : ''}
       </section>
       <section class="pa-group pa-danger"><h4>Remover</h4>
         <button type="button" class="btn-ghost danger" data-pa="delete">Excluir deste dispositivo</button>
@@ -1040,7 +1048,7 @@ async function openProjectActions(projectId) {
     share: () => { closeModal(); exportProject(projectId, { share: true }); },
     backups: () => openBackupsModal(projectId),
     'discard-recovery': () => confirmModal({
-      title: 'Descartar a recuperação?', body: 'As alterações protegidas de uma sessão interrompida serão removidas. A versão salva do projeto não muda.',
+      title: 'Descartar a recuperação?', body: 'As alterações guardadas de quando o app foi fechado sem salvar serão apagadas. A versão salva do projeto não muda.',
       confirmLabel: 'Descartar recuperação', danger: true,
       onConfirm: async () => { await discardRecoveryFor(projectId); await refreshProjectsUI(); toast('Recuperação descartada.', 'info'); },
     }),
@@ -1067,7 +1075,7 @@ function openRenameProjectModal(projectId) {
       <form id="renameProjectForm">
         <div class="form-group"><label class="form-label" for="renameProjectInput">Nome do projeto</label>
           <input class="form-input" id="renameProjectInput" maxlength="${PROJECT_NAME_MAX}" required value="${esc(meta.name)}"></div>
-        <p class="form-hint">O nome do arquivo .prg exportado será “${esc(prgFileNameForProject(meta.name))}”, gerado a partir do nome do projeto.</p>
+        <p class="form-hint">Ao exportar, o arquivo vai se chamar “${esc(prgFileNameForProject(meta.name))}”.</p>
         <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn-primary">Salvar nome</button></div>
       </form>`);
     document.getElementById('renameProjectForm').onsubmit = async event => {
@@ -1091,8 +1099,8 @@ function confirmDeleteLocalProject(projectId) {
       body: `“${meta.name}” será removido deste dispositivo, junto com as cópias de segurança e a recuperação dele.${meta.driveLink ? ' O arquivo no Google Drive não será apagado.' : ''}`,
       detailList: [
         ['Será removido', 'Projeto, cópias de segurança e recuperação deste projeto'],
-        ['Não será removido', meta.driveLink ? 'O arquivo no Google Drive e arquivos .prg exportados' : 'Arquivos .prg que você exportou'],
-        ['Importante', 'Depois disso, só será possível recuperar importando um .prg ou o arquivo do Drive'],
+        ['Não será removido', meta.driveLink ? 'A cópia no Google Drive e os arquivos exportados' : 'Arquivos de projeto que você exportou'],
+        ['Importante', 'Depois disso, só dá para recuperar abrindo um arquivo de projeto exportado ou a cópia do Google Drive'],
       ],
       confirmLabel: 'Excluir do dispositivo', danger: true,
       onConfirm: async () => {
@@ -1136,15 +1144,15 @@ function confirmDeleteEverywhere(projectId) {
 
 function confirmUnlinkDrive(projectId) {
   confirmModal({
-    title: 'Desvincular do Google Drive?',
+    title: 'Desconectar este projeto do Google Drive?',
     body: 'Só o vínculo será removido. O arquivo continua no Google Drive e o projeto continua neste dispositivo. As próximas alterações não serão sincronizadas.',
-    confirmLabel: 'Desvincular',
+    confirmLabel: 'Desconectar',
     onConfirm: async () => {
       await unlinkProjectFromDrive(projectStore, projectId);
       delete driveRemoteMeta[projectId]; delete driveLastError[projectId];
       if (state?.projectId === projectId) currentMeta = await projectStore.getProjectMeta(projectId);
       await refreshProjectsUI(); refreshDriveStatusUI();
-      toast('Projeto desvinculado do Google Drive.', 'info');
+      toast('Projeto desconectado do Google Drive.', 'info');
     },
   });
 }
@@ -1171,12 +1179,12 @@ function confirmTrashOnDrive(projectId) {
 function confirmLinkRemote(projectId, remote) {
   confirmModal({
     title: 'Vincular ao arquivo do Google Drive?',
-    body: `“${remote.name}” tem o mesmo identificador deste projeto. Depois de vincular, a próxima sincronização compara as duas versões e pede a sua escolha se forem diferentes.`,
+    body: `“${remote.name}” parece ser este mesmo projeto. Depois de ligar os dois, o ProfessorGest compara as versões e pergunta qual manter se forem diferentes.`,
     confirmLabel: 'Vincular',
     onConfirm: async () => {
       await projectStore.setDriveLink(projectId, { fileId: remote.id, fileName: remote.name, remoteModifiedTime: remote.modifiedTime, accountEmail: driveAccount?.email, accountPermissionId: driveAccount?.permissionId });
       await refreshProjectsUI();
-      toast('Projeto vinculado. Use “Sincronizar agora”.', 'info');
+      toast('Projeto conectado ao Google Drive. Use “Sincronizar agora”.', 'info');
     },
   });
 }
@@ -1197,7 +1205,7 @@ function plural(n, one, many) { return `${n} ${n === 1 ? one : many}`; }
 
 function driveHttp({ silent = false } = {}) {
   const getAccessToken = silent
-    ? async () => { if (!hasValidDriveToken()) throw new DriveError('auth', 'A autorização do Google Drive precisa ser renovada.'); return driveAccessToken; }
+    ? async () => { if (!hasValidDriveToken()) throw new DriveError('auth', 'Entre novamente na sua conta Google para continuar.'); return driveAccessToken; }
     : getDriveAccessToken;
   const invalidateToken = () => { driveAccessToken = null; driveTokenExpiresAt = 0; };
   return {
@@ -1219,7 +1227,7 @@ async function runDriveAction(task, { fromUser = true } = {}) {
   setDriveActionUI(true);
   try {
     if (tokenPromise) { await tokenPromise; driveNeedsInteraction = false; await refreshDriveAccountProfile(); }
-    else if (!hasValidDriveToken()) throw new DriveError('auth', 'A autorização do Google Drive precisa ser renovada.');
+    else if (!hasValidDriveToken()) throw new DriveError('auth', 'Entre novamente na sua conta Google para continuar.');
     return await task(createDriveApi(driveHttp({ silent: !fromUser })));
   } catch (err) {
     const kind = classifyDriveError(err, { online: navigator.onLine });
@@ -1229,6 +1237,46 @@ async function runDriveAction(task, { fromUser = true } = {}) {
   } finally {
     setDriveActionUI(false);
     refreshAccountUI();
+  }
+}
+
+function requestDriveTokenForOpen(projectId) {
+  if (demoMode || hasValidDriveToken() || !driveAccount || !isGoogleDriveConfigured()) return null;
+  if (!projectsCache.find(meta => meta.projectId === projectId)?.driveLink) return null;
+  return getDriveAccessToken({ forceConsent: false }).catch(() => null);
+}
+
+/** Ao abrir um projeto vinculado: consulta o Drive e aplica (ou pergunta sobre) uma versão mais nova. */
+async function checkDriveVersionOnOpen(projectId, tokenPromise = null) {
+  if (demoMode || !isGoogleDriveConfigured() || state?.projectId !== projectId || !currentDriveLink() || driveSyncing.has(projectId)) return;
+  if (tokenPromise) {
+    if (!(await tokenPromise)) return;
+    driveNeedsInteraction = false;
+    await refreshDriveAccountProfile().catch(() => {});
+  }
+  if (!hasValidDriveToken() || state?.projectId !== projectId) return;
+
+  driveSyncing.add(projectId);
+  refreshDriveStatusUI();
+  let result = null;
+  try {
+    result = await checkRemoteVersion(projectStore, createDriveApi(driveHttp({ silent: true })), projectId, { account: driveAccount, online: navigator.onLine });
+    if (result.error) driveLastError[projectId] = result.error; else delete driveLastError[projectId];
+    if (result.error === 'auth') driveNeedsInteraction = true;
+    if (result.remote) driveRemoteMeta[projectId] = result.remote;
+  } finally {
+    driveSyncing.delete(projectId);
+    if (state?.projectId === projectId) currentMeta = (await projectStore.getProjectMeta(projectId)) || currentMeta;
+    refreshDriveStatusUI();
+  }
+  if (!result || result.error || state?.projectId !== projectId) return;
+
+  // Se já houve edição desde a abertura, não sobrescreve: vira escolha do usuário.
+  if (result.status === SYNC_STATUS.REMOTE_NEWER && isDirty) { await flushLocalSave(); result = { ...result, status: SYNC_STATUS.CONFLICT }; }
+  if ([SYNC_STATUS.REMOTE_NEWER, SYNC_STATUS.CONFLICT, SYNC_STATUS.REMOTE_MISSING].includes(result.status) || result.reason === 'account-mismatch') {
+    await handleSyncResult(projectId, result, { fromUser: true });
+  } else if (result.status === SYNC_STATUS.PENDING) {
+    scheduleDriveAutoSync();
   }
 }
 
@@ -1570,19 +1618,19 @@ function renderCloudPanel() {
   const authState = currentDriveAuthState();
   const summary = cloudAccountSummary({ configured, account: driveAccount, authState });
   const loading = driveListing.status === 'loading';
+  // Faixa compacta: o Drive é opcional, então ocupa uma linha e não disputa atenção com os projetos.
   root.innerHTML = `
     <div class="cloud-panel-head">
       <div class="cloud-panel-account tone-${summary.tone}">
         ${driveAccount ? driveAccountAvatarHTML({ className: 'drive-account-avatar-lg' }) : `<span class="cloud-panel-icon" aria-hidden="true">${ICONS.cloud}</span>`}
-        <div><strong>${esc(summary.title)}</strong><span>${esc(summary.meta)}</span></div>
+        <div><strong>${driveAccount ? esc(summary.title) : 'Google Drive'}</strong><span>${driveAccount ? esc(summary.meta) : 'Opcional · sincronize seus projetos entre dispositivos'}</span></div>
       </div>
       <div class="cloud-panel-actions">
-        ${configured ? `<button type="button" class="btn-secondary btn-sm" id="cloudRefresh" ${loading ? 'disabled aria-busy="true"' : ''}>${ICONS.refresh} ${loading ? 'Atualizando…' : 'Atualizar lista do Drive'}</button>
-        <button type="button" class="btn-secondary btn-sm" id="cloudImport">${ICONS.folder} Importar do Google Drive</button>` : ''}
-        <button type="button" class="btn-ghost btn-sm" id="cloudAccount">${driveAccount ? 'Gerenciar conta' : (configured ? 'Conectar conta' : 'Saiba mais')}</button>
+        <button type="button" class="btn-ghost btn-sm" id="cloudRefresh" ${loading ? 'disabled aria-busy="true"' : ''}>${ICONS.refresh} ${loading ? 'Atualizando…' : 'Atualizar'}</button>
+        <button type="button" class="btn-ghost btn-sm" id="cloudImport">${ICONS.folder} Abrir do Drive</button>
+        <button type="button" class="btn-secondary btn-sm" id="cloudAccount">${driveAccount ? 'Gerenciar conta' : 'Conectar'}</button>
       </div>
-    </div>
-    <p class="cloud-panel-hint">O Google Drive guarda uma cópia dos seus projetos para sincronizar entre dispositivos. Seu trabalho continua salvo neste dispositivo, com ou sem o Drive.</p>`;
+    </div>`;
   document.getElementById('cloudRefresh')?.addEventListener('click', () => refreshDriveProjects({ fromUser: true }));
   document.getElementById('cloudImport')?.addEventListener('click', () => openDrivePicker());
   document.getElementById('cloudAccount')?.addEventListener('click', () => {
@@ -1595,7 +1643,7 @@ function updateWelcomeAccountControl() { renderCloudPanel(); }
 
 async function showWelcomeScreen({ withLoading = true } = {}) {
   clearPersistedRoute();
-  const loadingStartedAt = withLoading ? beginAppLoading('Preparando seus projetos...') : null;
+  const loadingStartedAt = withLoading ? beginAppLoading('Preparando seus projetos…') : null;
   try {
     workspaceReady = false;
     demoMode = false;
@@ -1618,24 +1666,24 @@ async function openLocalDataManager() {
   const recoveryIds = await projectStore.listRecoveryIds();
   openModal(`
     <div class="modal-title">Dados deste dispositivo</div>
-    <p class="confirm-body">Seus projetos ficam salvos neste navegador (IndexedDB). O <strong>.prg</strong> é um formato portátil para importar e exportar, e o Google Drive é uma cópia opcional na nuvem.</p>
+    <p class="confirm-body">Seus projetos ficam guardados neste aparelho e são salvos automaticamente. Para levar um projeto a outro aparelho, exporte o arquivo do projeto ou conecte o Google Drive.</p>
     <section class="local-data-section">
-      <div class="local-data-section-head"><div><strong>Projetos</strong><span>${plural(metas.length, 'projeto salvo', 'projetos salvos')} · sem limite de quantidade. Cópias de segurança e recuperação pertencem a cada projeto e são geridas nas ações do projeto.</span></div></div>
-      ${recoveryIds.length ? `<div class="local-data-row"><div><strong>Recuperações pendentes</strong><span>${plural(recoveryIds.length, 'projeto tem', 'projetos têm')} alterações protegidas de uma sessão interrompida.</span></div></div>` : ''}
+      <div class="local-data-section-head"><div><strong>Projetos</strong><span>${plural(metas.length, 'projeto salvo', 'projetos salvos')} . As cópias de segurança de cada projeto ficam no menu de ações do projeto.</span></div></div>
+      ${recoveryIds.length ? `<div class="local-data-row"><div><strong>Recuperações pendentes</strong><span>${plural(recoveryIds.length, 'projeto tem', 'projetos têm')} alterações guardadas de quando o app foi fechado sem salvar.</span></div></div>` : ''}
     </section>
     <section class="local-data-danger">
-      <div><strong>Apagar todos os dados deste dispositivo</strong><span>Remove todos os projetos, cópias de segurança, recuperações, a conta Google lembrada, registros de suporte e preferências.</span></div>
+      <div><strong>Apagar todos os dados deste dispositivo</strong><span>Remove todos os projetos, cópias de segurança, a conta Google lembrada e suas preferências.</span></div>
       <button type="button" class="btn-danger-solid btn-sm" id="btnClearAllLocalData">Apagar tudo</button>
     </section>
     <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Fechar</button></div>
   `);
   onClick('#btnClearAllLocalData', () => confirmModal({
     title: 'Apagar todos os dados deste dispositivo?',
-    body: 'Todos os projetos salvos neste dispositivo serão removidos permanentemente, com cópias de segurança e recuperações. Arquivos .prg que você exportou e arquivos no Google Drive não são apagados.',
+    body: 'Todos os projetos deste aparelho serão apagados para sempre, junto com as cópias de segurança. Arquivos de projeto que você exportou e as cópias no Google Drive continuam intactos.',
     detailList: [
-      ['Será apagado', `${plural(metas.length, 'projeto', 'projetos')}, cópias de segurança, recuperações, conta Google lembrada, registros e preferências`],
-      ['Não será apagado', 'Arquivos .prg exportados e arquivos no Google Drive'],
-      ['Importante', 'Depois disso, só será possível recuperar importando um .prg ou o arquivo do Drive'],
+      ['Será apagado', `${plural(metas.length, 'projeto', 'projetos')}, cópias de segurança, conta Google lembrada e preferências`],
+      ['Não será apagado', 'Arquivos de projeto exportados e cópias no Google Drive'],
+      ['Importante', 'Depois disso, só dá para recuperar abrindo um arquivo de projeto exportado ou a cópia do Google Drive'],
     ],
     confirmLabel: 'Apagar todos os dados', danger: true,
     onConfirm: () => clearAllDataAndReturnToWelcome(),
@@ -1912,7 +1960,7 @@ function updateThemeToggle() {
 function updateThemeColorMeta() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  meta.content = document.documentElement.dataset.theme === 'dark' ? '#0A1220' : '#F5F8FC';
+  meta.content = document.documentElement.dataset.theme === 'dark' ? '#12161D' : '#DFE4EB';
 }
 
 function toggleTheme() {
@@ -2117,8 +2165,8 @@ function openDriveAccountSettings() {
   if (!driveAccount) { connectGoogleDriveAccount(); return; }
   openModal(`
     <div class=\"drive-account-modal-head\">
-      ${driveAccountAvatarHTML({ className: 'drive-account-avatar-xl' })}
-      <div><div class=\"modal-title\">Conta do Google</div><p class=\"confirm-body\">Esta é a conta usada pelo ProfessorGest para abrir e sincronizar arquivos no Google Drive.</p></div>
+      <span class=\"drive-account-modal-icon\" aria-hidden=\"true\">${ICONS.cloud}</span>
+      <div><div class=\"modal-title\">Conta do Google</div><p class=\"confirm-body\">É com esta conta que o ProfessorGest guarda e atualiza a cópia dos seus projetos no Google Drive.</p></div>
     </div>
     <div class=\"drive-account-profile-card\">${driveAccountStatusHTML()}</div>
     <div class=\"drive-account-actions\">
@@ -2126,6 +2174,7 @@ function openDriveAccountSettings() {
       <button type=\"button\" class=\"btn-ghost\" id=\"btnDriveForgetAccount\">Remover conta lembrada</button>
     </div>
     <p class=\"form-hint\">Remover a conta lembrada não apaga arquivos do Google Drive nem desvincula projetos.</p>
+    <div class=\"form-actions\"><button type=\"button\" class=\"btn-secondary\" id=\"modalCancel\">Fechar</button></div>
   `, false);
   document.getElementById('btnDriveSwitchAccount')?.addEventListener('click', () => { closeModal(); switchDriveAccount(); });
   document.getElementById('btnDriveForgetAccount')?.addEventListener('click', () => {
@@ -2141,7 +2190,7 @@ function waitForGoogleIdentity(timeout = 10000) {
     const started = Date.now();
     const timer = setInterval(() => {
       if (window.google?.accounts?.oauth2) { clearInterval(timer); resolve(); }
-      else if (Date.now() - started > timeout) { clearInterval(timer); reject(new Error('Google Identity Services não carregou.')); }
+      else if (Date.now() - started > timeout) { clearInterval(timer); reject(new Error('Não foi possível carregar o login do Google.')); }
     }, 80);
   });
 }
@@ -2195,7 +2244,7 @@ function loadPickerApi(timeout = 10000) {
 
 /* Silencioso primeiro: o Google reutiliza a sessão/autorização existente quando possível. */
 async function getDriveAccessToken({ forceConsent = false, timeoutMs = 120000 } = {}) {
-  if (!isGoogleDriveConfigured()) throw new Error('Google Drive não está configurado para este aplicativo.');
+  if (!isGoogleDriveConfigured()) throw new Error('O Google Drive não está disponível nesta versão do ProfessorGest.');
   const now = Date.now();
   if (driveAccessToken && driveTokenExpiresAt > now + 60000) return driveAccessToken;
   if (driveTokenPromise) return driveTokenPromise;
@@ -2204,7 +2253,7 @@ async function getDriveAccessToken({ forceConsent = false, timeoutMs = 120000 } 
   const requestEpoch = driveSessionEpoch;
   driveTokenPromise = (async () => {
     await waitForGoogleIdentity();
-    if (!initDriveTokenClient()) throw new Error('Google Identity Services não está pronto. Recarregue a página e tente novamente.');
+    if (!initDriveTokenClient()) throw new Error('Não foi possível falar com o Google agora. Recarregue a página e tente de novo.');
     return await new Promise((resolve, reject) => {
       let settled = false;
       const settle = (fn, value) => {
@@ -2262,7 +2311,7 @@ async function getDriveAccessToken({ forceConsent = false, timeoutMs = 120000 } 
 
 function requestDriveAccessTokenFromClick({ forceConsent = false, selectAccount = false, onToken, onError } = {}) {
   if (!isGoogleDriveConfigured()) {
-    onError?.(new Error('Google Drive não está configurado para este aplicativo.'));
+    onError?.(new Error('O Google Drive não está disponível nesta versão do ProfessorGest.'));
     return false;
   }
   if (driveAccessToken && driveTokenExpiresAt > Date.now() + 60000) {
@@ -2447,9 +2496,9 @@ function openDrivePicker() {
 function resetContext() {
   ctx = { ...ctx, classId: null, studentId: null, activityId: null, classTab: 'visao', studentTab: 'visao',
     histFilter: 'todos', histMonth: '', studentSearch: '', studentClassFilter: '', studentSort: 'nome',
-    activityFilter: 'proximas', activityClassFilter: '', occSearch: '', occClassFilter: '', occTypeFilter: '', occMonth: '',
+    activityFilter: 'proximas', activityClassFilter: '', occSearch: '', occClassFilter: '', occTypeFilter: '', occPolarityFilter: '', occMonth: '',
     calMonth: todayYM(), calSelectedDay: null, calClassFilter: '', bulkMode: false, bulkSelected: new Set(), bulkContext: null,
-    assignmentId: null, reportStudentId: null, reportFrom: '', reportTo: '', reportOpts: null, reportSynthesis: '', classReportId: null, classReportFrom: '', classReportTo: ''
+    assignmentId: null, reportStudentId: null, reportFrom: '', reportTo: '', reportOpts: null, reportSynthesis: '', classReportId: null, classReportFrom: '', classReportTo: '', gradeFrom: '', gradeTo: ''
   };
 }
 
@@ -2474,10 +2523,13 @@ function openWelcomeSettingsModal() {
     <p class="confirm-body">Preferências do aplicativo e dados armazenados neste dispositivo.</p>
     <section class="local-data-section">
       <div class="local-data-section-head"><div><strong>Aparência</strong><span>Escolha como o ProfessorGest aparece neste dispositivo.</span></div></div>
-      <div class="theme-setting-grid">
-        <button type="button" class="theme-option ${mode === 'light' ? 'active' : ''}" data-entry-theme-mode="light" aria-pressed="false"><div class="theme-preview light"></div><strong>Claro</strong><span>Visual leve e luminoso.</span></button>
-        <button type="button" class="theme-option ${mode === 'dark' ? 'active' : ''}" data-entry-theme-mode="dark" aria-pressed="false"><div class="theme-preview dark"></div><strong>Escuro</strong><span>Confortável em ambientes com pouca luz.</span></button>
-        <button type="button" class="theme-option ${mode === 'system' ? 'active' : ''}" data-entry-theme-mode="system" aria-pressed="false"><div class="theme-preview system"></div><strong>Sistema</strong><span>Segue a preferência do dispositivo.</span></button>
+      ${themeChoicesHTML(mode, 'data-entry-theme-mode')}
+    </section>
+    <section class="local-data-section">
+      <div class="local-data-section-head"><div><strong>Conta Google</strong><span>Opcional. Usada para guardar cópias dos projetos no Google Drive.</span></div></div>
+      <div class="settings-account-row">
+        ${driveAccount ? driveAccountStatusHTML() : `<span class="cloud-panel-icon" aria-hidden="true">${ICONS.cloud}</span><div class="drive-account-copy"><strong>Nenhuma conta conectada</strong><span>Seus projetos continuam salvos neste aparelho.</span></div>`}
+        <button type="button" class="btn-secondary btn-sm" id="btnEntryDriveAccount">${driveAccount ? 'Gerenciar' : 'Conectar'}</button>
       </div>
     </section>
     <section class="local-data-section">
@@ -2501,6 +2553,7 @@ function openWelcomeSettingsModal() {
     syncEntryThemeOptions(nextMode);
   });
   onClick('#btnOpenLocalDataManager', () => openLocalDataManager());
+  onClick('#btnEntryDriveAccount', () => { closeModal(); openDriveAccountSettings(); });
 }
 
 
@@ -2642,11 +2695,11 @@ async function waitForMinimumBootDuration(startedAt) {
   const remaining = APP_BOOT_MIN_DURATION - elapsed;
   if (remaining <= 0) return;
 
-  if (remaining > 300) setBootStatus('Finalizando...');
+  if (remaining > 300) setBootStatus('Finalizando…');
   await new Promise(resolve => window.setTimeout(resolve, remaining));
 }
 
-function beginAppLoading(message = 'Carregando...') {
+function beginAppLoading(message = 'Carregando…') {
   const screen = document.getElementById('appBootScreen');
   const startedAt = performance.now();
   if (!screen) return startedAt;
@@ -2687,11 +2740,11 @@ async function finishAppBoot() {
 
 async function startApp() {
   initTheme();
-  setBootStatus('Carregando seu espaço...');
+  setBootStatus('Carregando seu espaço…');
   buildNav();
   bindGlobalEvents();
   bindSetupEvents();
-  setBootStatus('Preparando o ProfessorGest...');
+  setBootStatus('Preparando o ProfessorGest…');
   initGoogleDriveSdk();
   registerPwa();
   await migrateLegacyData();
@@ -2723,7 +2776,7 @@ async function startApp() {
 document.addEventListener('DOMContentLoaded', () => {
   startApp().catch(async (err) => {
     console.error('[ProfessorGest] Falha durante a inicialização.', err);
-    setBootStatus('Abrindo o ProfessorGest...');
+    setBootStatus('Abrindo o ProfessorGest…');
     await finishAppBoot();
   });
 });
@@ -2805,7 +2858,7 @@ function toast(message, kind) {
 
 const VIEW_TITLES = {
   dashboard: 'Início', turmas: 'Turmas', alunos: 'Alunos', escolas: 'Escolas', atividades: 'Atividades',
-  calendario: 'Calendário', planejamento: 'Planejamento', ocorrencias: 'Ocorrências', relatorios: 'Relatórios',
+  calendario: 'Calendário', planejamento: 'Planejamento', ocorrencias: 'Registros', relatorios: 'Relatórios',
   arquivo: 'Projeto', configuracoes: 'Configurações',
   turmaDetail: 'Turma', alunoDetail: 'Perfil do aluno', atividadeDetail: 'Atividade',
   relatorioIndividual: 'Relatório individual', relatorioTurma: 'Relatório da turma',
@@ -2905,13 +2958,26 @@ function emptyState(msg, sub) {
   return `<div class="empty-state"><div class="empty-title">${esc(msg)}</div>${sub ? `<div>${esc(sub)}</div>` : ''}</div>`;
 }
 function badgeFor(typeKey) {
-  const t = OCCUR_TYPES.find(x => x.key === typeKey) || { label: typeKey, tone: 'gray' };
-  return `<span class="badge badge-${t.tone}"><span class="badge-symbol" aria-hidden="true">${ICONS.bell}</span><span>${t.label}</span></span>`;
+  const t = OCCUR_TYPES.find(x => x.key === typeKey) || { label: typeKey, tone: 'gray', polarity: 'neutra' };
+  const symbol = t.polarity === 'positiva' ? ICONS.up : t.polarity === 'negativa' ? ICONS.down : ICONS.dot;
+  const polarityLabel = t.polarity === 'positiva' ? 'Positiva' : t.polarity === 'negativa' ? 'Negativa' : 'Neutra';
+  return `<span class="badge badge-${t.tone} badge-occ"><span class="badge-symbol" aria-hidden="true">${symbol}</span><span class="visually-hidden">${polarityLabel}: </span><span>${t.label}</span></span>`;
 }
+
+function gradeSettings() { return normalizeGradeSettings(state?.gradeSettings); }
+/** Ocorrências que entram na nota: as do contexto (turma/disciplina) e as registradas sem contexto. */
+function gradeOccurrencesFor(studentId, { classId = '', assignmentId = '', from = '', to = '' } = {}) {
+  return (state?.occurrences || []).filter(o => o.studentId === studentId
+    && (!classId || !o.classId || o.classId === classId)
+    && (!assignmentId || !o.assignmentId || o.assignmentId === assignmentId)
+    && (!from || o.date >= from) && (!to || o.date <= to));
+}
+function studentGrade(studentId, options) { return recommendGrade(gradeOccurrencesFor(studentId, options), gradeSettings()); }
 
 const studentActivityRenderers = createStudentActivityRenderers({
   getState: () => state, getCtx: () => ctx, esc, initials, classNameOf, studentStats, activityStats, activityStatus,
-  occurrencesOf, activitiesOf, assignmentNameOf, emptyState, fmtDate, monthLabel, badgeFor, todayISO, ICONS, searchFieldHTML
+  occurrencesOf, activitiesOf, assignmentNameOf, emptyState, fmtDate, monthLabel, badgeFor, todayISO, ICONS, searchFieldHTML,
+  studentGrade, formatGrade
 });
 
 
@@ -2947,7 +3013,7 @@ function renderRelatorioTurma() { return reportRenderers.renderRelatorioTurma();
 const fileSettingsRenderers = createFileSettingsRenderers({
   getState: () => state, esc, getDemoMode: () => demoMode, getIsDirty: () => isDirty, ICONS, getDriveActionPending: () => driveActionPending,
   supportsFileShare, getProjectInfo, getDriveAccount: () => driveAccount,
-  fmtDate, fmtDateTime, getThemeMode, getDevLogEntries
+  fmtDate, fmtDateTime, getThemeMode, getDevLogEntries, gradeSettings, occurrenceTypes: OCCUR_TYPES, occurrencePolarities: OCCURRENCE_POLARITIES, formatGrade
 });
 
 function renderArquivo() { return fileSettingsRenderers.renderArquivo(); }
@@ -2959,7 +3025,7 @@ const planningViewRenderer = createPlanningViewRenderer({
 
 const classViewRenderers = createClassViewRenderers({
   getState: () => state, getCtx: () => ctx, classById, classStats, studentsOf, occurrencesOf, studentById, assignmentsOf, assignmentById, schoolNameOf,
-  initials, activityListItemHTML, esc, fmtDate, todayISO, emptyState, badgeFor, ICONS
+  initials, activityListItemHTML, esc, fmtDate, todayISO, emptyState, badgeFor, ICONS, studentGrade, formatGrade, formatPoints
 });
 
 
@@ -3075,7 +3141,7 @@ function openIndividualReportConfig(presetStudentId) {
     <div class="modal-title">Relatório individual do aluno</div>
     <form id="reportConfigForm">
       <div class="form-group"><label class="form-label" for="reportStudentSearch">Aluno</label>
-        ${searchFieldHTML('reportStudentSearch', 'Pesquisar aluno...', selectedStudent?.name || '')}
+        ${searchFieldHTML('reportStudentSearch', 'Pesquisar aluno…', selectedStudent?.name || '')}
         <input type="hidden" id="reportStudentId" name="studentId" value="${esc(ctx.reportStudentId || '')}">
         <div class="entity-picker-results" id="reportStudentResults">${reportStudentPickerHTML(selectedStudent?.name || '', ctx.reportStudentId || '')}</div>
       </div>
@@ -3139,7 +3205,7 @@ function openClassReportConfig(presetClassId) {
     <div class="modal-title">Relatório da turma</div>
     <form id="classReportConfigForm">
       <div class="form-group"><label class="form-label" for="classReportSearch">Turma</label>
-        ${searchFieldHTML('classReportSearch', 'Pesquisar turma...', selectedClass?.name || '')}
+        ${searchFieldHTML('classReportSearch', 'Pesquisar turma…', selectedClass?.name || '')}
         <input type="hidden" id="classReportId" name="classId" value="${esc(ctx.classReportId || '')}">
         <div class="entity-picker-results" id="classReportResults">${reportClassPickerHTML(selectedClass?.name || '', ctx.classReportId || '')}</div>
       </div>
@@ -3197,7 +3263,7 @@ async function doExportPdf() {
     toast('O exportador de PDF não pôde ser carregado. Use "Imprimir" e escolha "Salvar como PDF".', 'error');
     return;
   }
-  toast('Gerando PDF...', null);
+  toast('Gerando PDF…', null);
   try {
     const canvas = await window.html2canvas(area, {
       scale: Math.min(2, window.devicePixelRatio || 1.5),
@@ -3298,17 +3364,74 @@ function openAddClassModal() {
 function openClassModal(existing) {
   const school = existing?.schoolId ? schoolById(existing.schoolId) : null;
   const assignment = assignmentsOf(existing?.id || '')[0] || null;
+  const schoolName = school?.name || existing?.ded?.schoolName || '';
   openModal(`
     <div class="modal-title">${existing ? 'Editar turma' : 'Nova turma'}</div>
     <form id="classForm">
       <div class="form-group"><label class="form-label" for="classNameInput">Nome da turma</label><input class="form-input" id="classNameInput" name="name" required value="${existing ? esc(existing.name) : ''}" placeholder="Ex.: 2º Ano A"></div>
-      <div class="form-row"><div class="form-group"><label class="form-label" for="classSchoolInput">Escola</label><input class="form-input" id="classSchoolInput" name="schoolName" value="${esc(school?.name || existing?.ded?.schoolName || '')}" placeholder="Ex.: Escola Estadual Aurora"></div><div class="form-group"><label class="form-label" for="classSubjectInput">Disciplina</label><input class="form-input" id="classSubjectInput" name="subject" value="${esc(assignment?.subject || existing?.ded?.component || '')}" placeholder="Ex.: Língua Inglesa"></div></div>
+      <div class="form-group"><label class="form-label" for="classSchoolSearch">Escola</label>
+        ${searchFieldHTML('classSchoolSearch', 'Pesquisar ou cadastrar escola…', schoolName)}
+        <input type="hidden" id="classSchoolId" name="schoolId" value="${esc(school?.id || '')}">
+        <div class="entity-picker-results" id="classSchoolResults">${classSchoolPickerHTML(schoolName, school?.id || '')}</div>
+      </div>
+      <div class="form-group"><label class="form-label" for="classSubjectInput">Disciplina</label><input class="form-input" id="classSubjectInput" name="subject" value="${esc(assignment?.subject || existing?.ded?.component || '')}" placeholder="Ex.: Língua Inglesa"></div>
       <div class="form-row"><div class="form-group"><label class="form-label" for="classYearInput">Ano letivo</label><input class="form-input" id="classYearInput" name="year" value="${esc(existing?.year || existing?.ded?.year || '')}" placeholder="Ex.: 2026"></div><div class="form-group"><label class="form-label" for="classShiftInput">Turno</label><input class="form-input" id="classShiftInput" name="shift" value="${esc(existing?.shift || existing?.ded?.shift || '')}" placeholder="Ex.: Manhã"></div></div>
       <p class="form-hint">A escola e a disciplina são informações da atuação, não do perfil do professor. Uma turma pode ter várias disciplinas.</p>
       <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn-primary">${existing ? 'Salvar' : 'Criar turma'}</button></div>
     </form>
   `);
   document.getElementById('classForm').dataset.editId = existing ? existing.id : '';
+  const schoolSearch = document.getElementById('classSchoolSearch');
+  if (schoolSearch) schoolSearch.oninput = () => {
+    const hidden = document.getElementById('classSchoolId');
+    const picked = schoolById(hidden?.value);
+    // Ao editar o texto, a escola escolhida só continua valendo se o nome ainda for o dela.
+    if (hidden && (!picked || normalizeDedClassKey(picked.name) !== normalizeDedClassKey(schoolSearch.value))) hidden.value = '';
+    refreshClassSchoolPicker();
+  };
+  bindClassSchoolPicker();
+}
+
+function classSchoolPickerHTML(searchTerm = '', selectedId = '') {
+  const term = normalizeDedClassKey(searchTerm);
+  const schools = [...(state.schools || [])].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const list = term ? schools.filter(sc => normalizeDedClassKey(`${sc.name} ${sc.code || ''}`).includes(term)) : schools;
+  const exact = term && schools.some(sc => normalizeDedClassKey(sc.name) === term);
+  const options = list.map(sc => {
+    const count = state.classes.filter(c => c.schoolId === sc.id).length;
+    return createEntityPickerOption({
+      id: sc.id, name: sc.name, secondary: [plural(count, 'turma', 'turmas'), sc.code ? `Código ${sc.code}` : ''].filter(Boolean).join(' · '),
+      selected: sc.id === selectedId, icon: `<span class="avatar sm" aria-hidden="true">${ICONS.school}</span>`, dataAttr: 'data-class-school'
+    });
+  }).join('');
+  const createOption = term && !exact ? createEntityPickerOption({
+    id: '', name: `Cadastrar "${String(searchTerm).trim()}"`, secondary: 'Nova escola · será cadastrada ao salvar a turma',
+    icon: `<span class="avatar sm" aria-hidden="true">${ICONS.plus}</span>`, dataAttr: 'data-class-school-new'
+  }) : '';
+  return options + createOption || createEntityPickerEmpty(schools.length ? 'Nenhuma escola encontrada.' : 'Nenhuma escola cadastrada. Digite o nome para cadastrar uma nova.');
+}
+
+function refreshClassSchoolPicker() {
+  const list = document.getElementById('classSchoolResults');
+  if (list) list.innerHTML = classSchoolPickerHTML(document.getElementById('classSchoolSearch')?.value || '', document.getElementById('classSchoolId')?.value || '');
+  bindClassSchoolPicker();
+}
+
+function bindClassSchoolPicker() {
+  const input = document.getElementById('classSchoolSearch');
+  const hidden = document.getElementById('classSchoolId');
+  qAll('[data-class-school]').forEach(el => el.onclick = () => {
+    const school = schoolById(el.dataset.classSchool);
+    if (!school) return;
+    if (hidden) hidden.value = school.id;
+    if (input) input.value = school.name;
+    refreshClassSchoolPicker();
+  });
+  qAll('[data-class-school-new]').forEach(el => el.onclick = () => {
+    if (hidden) hidden.value = '';
+    if (input) input.value = input.value.trim();
+    document.getElementById('classSubjectInput')?.focus();
+  });
 }
 
 function openStudentModal(existing, presetClassId) {
@@ -3367,8 +3490,8 @@ function openPlanningModal(existing, presetClassId = '') {
       <div class="form-group"><label class="form-label" for="planningTitleInput">Tema da aula</label><input class="form-input" id="planningTitleInput" name="title" required value="${existing ? esc(existing.title) : ''}" placeholder="Ex.: Frações equivalentes"></div>
       <div class="form-group"><label class="form-label" for="planningContentInput">Conteúdo</label><textarea class="form-textarea" id="planningContentInput" name="content" placeholder="O que será trabalhado nesta aula?">${existing ? esc(existing.content || '') : ''}</textarea></div>
       <div class="form-group"><label class="form-label" for="planningObjectivesInput">Objetivos de aprendizagem</label><textarea class="form-textarea" id="planningObjectivesInput" name="objectives" placeholder="O que os alunos deverão compreender ou conseguir fazer?">${existing ? esc(existing.objectives || '') : ''}</textarea></div>
-      <div class="form-group"><label class="form-label" for="planningMethodologyInput">Como será a aula?</label><textarea class="form-textarea" id="planningMethodologyInput" name="methodology" placeholder="Ex.: explicação, atividade em grupo, exercícios...">${existing ? esc(existing.methodology || '') : ''}</textarea></div>
-      <div class="form-row"><div class="form-group"><label class="form-label" for="planningResourcesInput">Recursos</label><textarea class="form-textarea" id="planningResourcesInput" name="resources" placeholder="Livro, quadro, projetor...">${existing ? esc(existing.resources || '') : ''}</textarea></div><div class="form-group"><label class="form-label" for="planningAssessmentInput">Acompanhamento / avaliação</label><textarea class="form-textarea" id="planningAssessmentInput" name="assessment" placeholder="Como você pretende observar a aprendizagem?">${existing ? esc(existing.assessment || '') : ''}</textarea></div></div>
+      <div class="form-group"><label class="form-label" for="planningMethodologyInput">Como será a aula?</label><textarea class="form-textarea" id="planningMethodologyInput" name="methodology" placeholder="Ex.: explicação, atividade em grupo, exercícios…">${existing ? esc(existing.methodology || '') : ''}</textarea></div>
+      <div class="form-row"><div class="form-group"><label class="form-label" for="planningResourcesInput">Recursos</label><textarea class="form-textarea" id="planningResourcesInput" name="resources" placeholder="Livro, quadro, projetor…">${existing ? esc(existing.resources || '') : ''}</textarea></div><div class="form-group"><label class="form-label" for="planningAssessmentInput">Acompanhamento / avaliação</label><textarea class="form-textarea" id="planningAssessmentInput" name="assessment" placeholder="Como você pretende observar a aprendizagem?">${existing ? esc(existing.assessment || '') : ''}</textarea></div></div>
       <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn-primary">${existing ? 'Salvar planejamento' : 'Criar planejamento'}</button></div>
     </form>` , true);
   document.getElementById('planningForm').dataset.editId = existing ? existing.id : '';
@@ -3460,7 +3583,7 @@ function openOccurrenceStep1(searchTerm, presetClassId = '') {
   openModal(`
     <div class="modal-title">Registrar ocorrência</div>
     <div class="form-group"><label class="form-label" for="quickSearchInput">Quem?</label>
-      ${searchFieldHTML('quickSearchInput', 'Pesquisar aluno...', searchTerm || '')}</div>
+      ${searchFieldHTML('quickSearchInput', 'Pesquisar aluno…', searchTerm || '')}</div>
     <div class="list-card quick-student-list" id="quickStudentList">${result.html}</div>
     <div class="quick-add-student" id="quickAddStudentWrap">${result.term ? `<button type="button" class="btn-secondary btn-sm" id="quickAddStudentBtn">${ICONS.plus} Adicionar “${esc(String(searchTerm || '').trim())}” como aluno</button>` : '<span class="form-hint">Adicione o aluno somente quando precisar acompanhá-lo.</span>'}</div>
     <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button></div>
@@ -3493,8 +3616,12 @@ function openQuickAddStudentModal(suggestedName = '', presetClassId = '') {
 function openOccurrenceStep2(studentIds, editingOcc) {
   const students = studentIds.map(studentById).filter(Boolean);
   if (!students.length) { openOccurrenceStep1(''); return; }
-  const occurrenceIcons = { nao_atividade: ICONS.alert, conversou: ICONS.bell, faltou: ICONS.calendar, participou: ICONS.check, bom_comportamento: ICONS.check, observacao: ICONS.file };
-  const opts = OCCUR_TYPES.map(t => `<button type="button" class="quick-opt ${editingOcc && editingOcc.type === t.key ? 'selected' : ''}" data-occ-type="${esc(t.key)}"><span class="quick-opt-icon" aria-hidden="true">${occurrenceIcons[t.key] || ICONS.file}</span><span>${t.label}</span></button>`).join('');
+  const occurrenceIcons = { nao_atividade: ICONS.alert, conversou: ICONS.bell, mau_comportamento: ICONS.alert, faltou: ICONS.calendar, participou: ICONS.check, bom_comportamento: ICONS.check, fez_atividade: ICONS.clipboard, observacao: ICONS.file };
+  const optButton = t => `<button type="button" class="quick-opt ${editingOcc && editingOcc.type === t.key ? 'selected' : ''}" data-occ-type="${esc(t.key)}"><span class="quick-opt-icon" aria-hidden="true">${occurrenceIcons[t.key] || ICONS.file}</span><span>${t.label}</span></button>`;
+  const opts = OCCURRENCE_POLARITIES.map(p => {
+    const types = OCCUR_TYPES.filter(t => t.polarity === p.key);
+    return types.length ? `<div class="occ-type-group occ-type-${p.key}"><div class="occ-type-group-label">${p.label}</div><div class="quick-options">${types.map(optButton).join('')}</div></div>` : '';
+  }).join('');
   const multi = students.length > 1;
   openModal(`
     <div class="modal-title">${editingOcc ? 'Editar ocorrência' : 'O que aconteceu?'}</div>
@@ -3504,11 +3631,11 @@ function openOccurrenceStep2(studentIds, editingOcc) {
     </div>
     <form id="occurForm">
       <input type="hidden" name="studentIds" value="${studentIds.join(',')}">
-      <div class="form-group"><div class="quick-options" id="occTypeOptions">${opts}</div>
+      <div class="form-group"><div class="occ-type-groups" id="occTypeOptions">${opts}</div>
         <input type="hidden" name="type" value="${editingOcc ? editingOcc.type : ''}" required></div>
       <div class="form-group"><label class="form-label" for="observationDateInput">Data</label><input class="form-input" id="observationDateInput" type="date" name="date" value="${editingOcc ? editingOcc.date : todayISO()}"></div>
       <div class="form-row"><div class="form-group"><label class="form-label" for="occurrenceClassInput">Turma</label><select class="form-select" id="occurrenceClassInput" name="classId">${classOptions(students[0]?.classId || editingOcc?.classId || ctx.classId || '')}</select></div><div class="form-group"><label class="form-label" for="occurrenceAssignmentInput">Disciplina</label><select class="form-select" id="occurrenceAssignmentInput" name="assignmentId">${assignmentOptions(students[0]?.classId || editingOcc?.classId || ctx.classId || '', editingOcc?.assignmentId || ctx.assignmentId || '')}</select></div></div>
-      <div class="form-group"><label class="form-label" for="occurrenceDescriptionInput">Descrição (opcional)</label><textarea class="form-textarea" id="occurrenceDescriptionInput" name="description" placeholder="Detalhes...">${editingOcc ? esc(editingOcc.description || '') : ''}</textarea></div>
+      <div class="form-group"><label class="form-label" for="occurrenceDescriptionInput">Descrição (opcional)</label><textarea class="form-textarea" id="occurrenceDescriptionInput" name="description" placeholder="Detalhes…">${editingOcc ? esc(editingOcc.description || '') : ''}</textarea></div>
       <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Cancelar</button>
         <button type="submit" class="btn-primary">${editingOcc ? 'Salvar alterações' : (multi ? 'Registrar para todos' : 'Registrar')}</button></div>
     </form>
@@ -3528,7 +3655,8 @@ function bindModalEvents() {
     e.preventDefault();
     const name = e.target.name.value.trim();
     if (!name) return;
-    const schoolName = e.target.schoolName.value.trim();
+    const schoolName = (document.getElementById('classSchoolSearch')?.value || '').trim();
+    const pickedSchool = schoolById(e.target.schoolId?.value);
     const subject = e.target.subject.value.trim();
     const year = e.target.year.value.trim();
     const shift = e.target.shift.value.trim();
@@ -3536,11 +3664,15 @@ function bindModalEvents() {
     let cls = editId ? classById(editId) : null;
     if (!cls) { cls = { id: uid('class'), name, archived: false, schoolId: null, year, shift, classCode: '' }; state.classes.push(cls); }
     cls.name = name; cls.year = year; cls.shift = shift;
-    if (schoolName) {
+    if (pickedSchool) {
+      cls.schoolId = pickedSchool.id;
+      pruneEmptySchools();
+    } else if (schoolName) {
       const key = normalizeDedClassKey(schoolName);
       let school = state.schools.find(item => normalizeDedClassKey(item.name) === key);
       if (!school) { school = { id: uid('school'), name: schoolName, code: '', sre: '', address: '' }; state.schools.push(school); }
       cls.schoolId = school.id;
+      pruneEmptySchools();
     }
     if (subject) {
       state.assignments = Array.isArray(state.assignments) ? state.assignments : [];
@@ -3747,7 +3879,7 @@ function openCommandPalette(term) {
       <div class="cmdk-box">
         <div class="cmdk-input-row">
           ${ICONS.search}
-          <input class="cmdk-input" id="cmdkInput" placeholder="Buscar alunos, turmas, atividades, planejamentos ou ações..." value="${esc(term || '')}">
+          <input class="cmdk-input" id="cmdkInput" placeholder="Buscar alunos, turmas, atividades, planejamentos ou ações…" value="${esc(term || '')}">
           <span class="cmdk-esc">ESC</span>
           <button class="cmdk-close" id="cmdkCloseBtn" type="button" aria-label="Fechar pesquisa" title="Fechar pesquisa">${ICONS.x}</button>
         </div>
@@ -3948,6 +4080,7 @@ function bindViewEvents() {
     }});
   });
   qAll('[data-activity-filter]').forEach(el => el.onclick = () => { ctx.activityFilter = el.dataset.activityFilter; render(); });
+  qAll('[data-occ-polarity]').forEach(el => el.onclick = () => { ctx.occPolarityFilter = el.dataset.occPolarity; render(); });
   const activitySearchInput = q('#activitySearchInput');
   if (activitySearchInput) activitySearchInput.oninput = () => { ctx.activitySearch = activitySearchInput.value; rerenderKeepFocus(); };
   const activityClassFilterSelect = q('#activityClassFilterSelect');
@@ -4005,6 +4138,9 @@ function bindViewEvents() {
     applyThemeMode(nextMode);
     render();
   });
+  qAll('[data-settings-jump]').forEach(el => el.onclick = () => {
+    document.getElementById(el.dataset.settingsJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   /* --- arquivo / configurações --- */
   onClick('#btnExitDemo', () => exitDemoMode());
@@ -4041,6 +4177,29 @@ function bindViewEvents() {
     state.teacher.name = document.getElementById('teacherNameInput').value.trim() || 'Professor(a)';
     markDirty(); toast('Nome do professor atualizado.', 'success'); render();
   });
+  const gradeSettingsForm = q('#gradeSettingsForm');
+  if (gradeSettingsForm) gradeSettingsForm.onsubmit = e => {
+    e.preventDefault();
+    const f = e.target;
+    const weights = {};
+    OCCUR_TYPES.forEach(t => { weights[t.key] = f[`w_${t.key}`]?.value; });
+    const max = Number(String(f.max.value).replace(',', '.'));
+    if (!Number.isFinite(max) || max <= 0) { toast('Informe uma nota máxima maior que zero.', 'error'); return; }
+    state.gradeSettings = normalizeGradeSettings({ base: f.base.value, max: f.max.value, weights });
+    markDirty(); toast('Pontuação da nota recomendada salva.', 'success'); render();
+  };
+  onClick('#btnResetGradeSettings', () => {
+    state.gradeSettings = normalizeGradeSettings(DEFAULT_GRADE_SETTINGS);
+    markDirty(); toast('Pontuação padrão restaurada.', 'success'); render();
+  });
+  const gradeFromInput = q('#gradeFromInput');
+  if (gradeFromInput) gradeFromInput.onchange = () => { ctx.gradeFrom = gradeFromInput.value; render(); };
+  const gradeToInput = q('#gradeToInput');
+  if (gradeToInput) gradeToInput.onchange = () => { ctx.gradeTo = gradeToInput.value; render(); };
+  onClick('#btnGradeSettings', () => {
+    navigate('configuracoes');
+    requestAnimationFrame(() => document.getElementById('gradeSettingsCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  });
 }
 
 function onClick(sel, fn) { const el = q(sel); if (el) el.onclick = fn; }
@@ -4049,6 +4208,15 @@ function qAll(sel) { return document.querySelectorAll(sel); }
 function shiftMonth(ym, delta) { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + delta, 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; }
 
 /* ==================== ações de turma / aluno ==================== */
+
+/** Remove as escolas que ficaram sem turmas. Devolve quantas foram removidas. */
+function pruneEmptySchools() {
+  const removed = new Set(emptySchoolIds(state));
+  if (!removed.size) return 0;
+  state.schools = state.schools.filter(school => !removed.has(school.id));
+  (state.assignments || []).forEach(a => { if (removed.has(a.schoolId)) a.schoolId = null; });
+  return removed.size;
+}
 
 function deleteClass(classId) {
   const cls = classById(classId);
@@ -4059,10 +4227,15 @@ function deleteClass(classId) {
   const relAssignments = (state.assignments || []).filter(a => a.classId === classId);
   const relStudentIds = new Set(relStudents.map(s => s.id));
   const relOccurrences = state.occurrences.filter(o => relStudentIds.has(o.studentId) && (!o.classId || o.classId === classId));
+  const alreadyEmpty = new Set(emptySchoolIds(state));
+  const orphanSchools = emptySchoolIds({ ...state, classes: state.classes.filter(c => c.id !== classId) })
+    .filter(id => !alreadyEmpty.has(id)).map(schoolById).filter(Boolean);
 
   confirmModal({
     title: `Excluir turma "${cls.name}"?`,
-    body: 'Os alunos, atividades e ocorrências relacionadas também serão excluídos para não deixar registros soltos. Esta ação não pode ser desfeita.',
+    body: 'Os alunos, atividades e ocorrências relacionadas também serão excluídos para não deixar registros soltos.'
+      + (orphanSchools.length ? ` A escola "${orphanSchools.map(sc => sc.name).join('", "')}" ficará sem turmas e também será removida.` : '')
+      + ' Esta ação não pode ser desfeita.',
     detailList: [['Alunos', relStudents.length], ['Disciplinas', relAssignments.length], ['Atividades', relActivities.length], ['Planejamentos', relPlans.length], ['Ocorrências', relOccurrences.length]],
     confirmLabel: 'Excluir turma', danger: true,
     onConfirm: () => {
@@ -4073,7 +4246,8 @@ function deleteClass(classId) {
       state.activities = state.activities.filter(a => a.classId !== classId);
       state.plans = (state.plans || []).filter(p => p.classId !== classId);
       state.occurrences = state.occurrences.filter(o => !relStudentIds.has(o.studentId));
-      markDirty(); toast('Turma excluída.', 'success');
+      const removedSchools = pruneEmptySchools();
+      markDirty(); toast(removedSchools ? 'Turma excluída. A escola sem turmas também foi removida.' : 'Turma excluída.', 'success');
       if (ctx.classId === classId) navigate('turmas'); else render();
     },
   });
@@ -4227,6 +4401,7 @@ function buildSavePayload() {
     activities: (state.activities || []).map(({ completions, ...activity }) => activity),
     occurrences: state.occurrences,
     plans: Array.isArray(state.plans) ? state.plans : [],
+    ...(state.gradeSettings ? { gradeSettings: normalizeGradeSettings(state.gradeSettings) } : {}),
   };
 }
 

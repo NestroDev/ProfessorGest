@@ -41,6 +41,7 @@ Thumbs.db
 dist/
 build/
 _site/
+.claude/
 
 # Local development copy with a real Google API key
 google-drive-config.local.js

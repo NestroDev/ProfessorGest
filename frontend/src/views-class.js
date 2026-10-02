@@ -18,7 +18,97 @@ export function createClassViewRenderers(deps) {
     emptyState,
     badgeFor,
     ICONS,
+    studentGrade = () => null,
+    formatGrade = value => String(value),
+    formatPoints = value => String(value),
   } = deps;
+
+  function gradeTone(result) {
+    const ratio = result.max ? result.grade / result.max : 0;
+    if (ratio >= 0.7) return 'good';
+    if (ratio >= 0.5) return 'mid';
+    return 'low';
+  }
+
+  function renderClassGradesTab(classroom, students, selected) {
+    const ctx = getCtx();
+    const from = ctx.gradeFrom || '';
+    const to = ctx.gradeTo || '';
+    const rows = students
+      .map(student => ({
+        student,
+        result: studentGrade(student.id, {
+          classId: classroom.id,
+          assignmentId: selected?.id || '',
+          from,
+          to,
+        }),
+      }))
+      .filter(row => row.result)
+      .sort((a, b) => a.student.name.localeCompare(b.student.name, 'pt-BR'));
+
+    return `
+      <div class="card grade-filter-card">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="gradeFromInput">De</label>
+            <input class="form-input" type="date" id="gradeFromInput" value="${esc(from)}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="gradeToInput">Até</label>
+            <input class="form-input" type="date" id="gradeToInput" value="${esc(to)}">
+          </div>
+        </div>
+        <div class="row-between grade-filter-foot">
+          <p class="form-hint">
+            Nota sugerida a partir dos registros positivos e negativos${
+              selected ? ` de ${esc(selected.subject)} e dos registros sem disciplina` : ''
+            }. Ela é só uma referência: confira antes de lançar.
+          </p>
+          <button type="button" class="btn-secondary btn-sm" id="btnGradeSettings">
+            ${ICONS.settings || ICONS.edit} Ajustar pontos
+          </button>
+        </div>
+      </div>
+      <div class="card list-card">
+        ${
+          rows
+            .map(({ student, result }) => {
+              const detail = result.total
+                ? [
+                    `${result.positive} ${result.positive === 1 ? 'positiva' : 'positivas'}`,
+                    `${result.negative} ${result.negative === 1 ? 'negativa' : 'negativas'}`,
+                    ...result.byCategory
+                      .filter(category => category.points)
+                      .map(category => `${category.label} ${formatPoints(category.points)}`),
+                  ].join(' · ')
+                : 'Sem registros no período · nota base';
+
+              return `
+                <div class="list-item">
+                  <div
+                    class="list-item-main"
+                    data-open-student="${esc(student.id)}"
+                    role="button"
+                    tabindex="0"
+                  >
+                    <div class="avatar sm">${initials(student.name)}</div>
+                    <div>
+                      <div class="list-item-title">${esc(student.name)}</div>
+                      <div class="list-item-sub">${esc(detail)}</div>
+                    </div>
+                  </div>
+                  <div class="grade-value grade-${gradeTone(result)}" aria-label="Nota recomendada ${esc(formatGrade(result.grade))} de ${esc(formatGrade(result.max))}">
+                    <strong>${esc(formatGrade(result.grade))}</strong><span>/ ${esc(formatGrade(result.max))}</span>
+                  </div>
+                </div>
+              `;
+            })
+            .join('') || emptyState('Nenhum aluno nesta turma.')
+        }
+      </div>
+    `;
+  }
 
   function renderClassStudentsTab(classroom) {
     const alunos = studentsOf(classroom.id);
@@ -167,6 +257,7 @@ export function createClassViewRenderers(deps) {
       { key: 'alunos', label: 'Alunos' },
       { key: 'atividades', label: 'Atividades' },
       { key: 'ocorrencias', label: 'Registros' },
+      { key: 'notas', label: 'Notas' },
       { key: 'relatorios', label: 'Relatórios' },
     ];
 
@@ -256,7 +347,7 @@ export function createClassViewRenderers(deps) {
                             ${esc(student ? student.name : 'Aluno removido')}
                           </div>
                           <div class="list-item-sub">
-                            ${fmtDate(occurrence.date)} · ${badgeFor(occurrence.type)}
+                            ${fmtDate(occurrence.date)} ${badgeFor(occurrence.type)}
                           </div>
                         </div>
                       </div>
@@ -313,7 +404,7 @@ export function createClassViewRenderers(deps) {
                         ${esc(student ? student.name : 'Aluno removido')}
                       </div>
                       <div class="list-item-sub">
-                        ${fmtDate(occurrence.date)} · ${badgeFor(occurrence.type)}${
+                        ${fmtDate(occurrence.date)} ${badgeFor(occurrence.type)}${
                           occurrence.description
                             ? ` · ${esc(occurrence.description)}`
                             : ''
@@ -327,6 +418,8 @@ export function createClassViewRenderers(deps) {
           }
         </div>
       `;
+    } else if (tab === 'notas') {
+      body = renderClassGradesTab(classroom, stats.alunos, selected);
     } else {
       body = `
         <div class="card narrow-card">

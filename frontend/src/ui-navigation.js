@@ -2,7 +2,7 @@ const ROUTE_KEY = 'professorgest-navigation-v2';
 const ROUTE_CTX_KEYS = [
   'classId', 'assignmentId', 'studentId', 'activityId', 'classTab', 'studentTab', 'histFilter', 'histMonth',
   'studentSearch', 'studentClassFilter', 'studentSort', 'activityFilter', 'activityClassFilter',
-  'occSearch', 'occClassFilter', 'occTypeFilter', 'occMonth', 'calMonth', 'calSelectedDay', 'calClassFilter',
+  'occSearch', 'occClassFilter', 'occTypeFilter', 'occPolarityFilter', 'occMonth', 'calMonth', 'calSelectedDay', 'calClassFilter',
   'reportStudentId', 'reportFrom', 'reportTo', 'reportOpts', 'reportSynthesis', 'classReportId',
   'classReportFrom', 'classReportTo', 'classSearch', 'activitySearch', 'planningSearch',
   'planningClassFilter', 'planningFrom', 'planningTo', 'showArchivedClasses'

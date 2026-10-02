@@ -5,7 +5,7 @@ import { createMemoryAdapter, createProjectStore, isDrivePending, IMPORT_MODES }
 import {
   SYNC_STATUS, DriveError, buildAppProperties, isManagedFile, managedFilesQuery, discoverDriveProjects, mergeProjectLists,
   computeSyncStatus, syncProject, resolveConflictKeepLocal, resolveConflictUseRemote, addDriveProjectToDevice,
-  trashProjectOnDrive, removeFromDeviceAndDrive, classifyDriveError, DRIVE_SCOPE, syncLabel,
+  trashProjectOnDrive, removeFromDeviceAndDrive, classifyDriveError, DRIVE_SCOPE, syncLabel, checkRemoteVersion,
 } from '../frontend/src/drive-sync.js';
 import { driveAuthState, DRIVE_AUTH_STATES, normalizeDriveAccount } from '../frontend/src/drive-account.js';
 import { serializeProjectToPrg } from '../frontend/src/prg-transfer.js';
@@ -130,6 +130,36 @@ test('remoto mais novo sem alterações locais -> remote-newer; com alterações
   assert.equal(drive.files.get(id).content.includes('nuvem'), true, 'nada foi enviado');
   const remote = await drive.api.getMeta(id);
   assert.equal(computeSyncStatus(await store.getProjectMeta('P1'), remote), SYNC_STATUS.CONFLICT);
+});
+
+test('ao abrir: checkRemoteVersion só consulta metadados e detecta versão mais nova ou conflito', async () => {
+  const store = makeStore(); const drive = fakeDrive();
+  await store.createProject(project('P1', { name: 'v1' }));
+  assert.equal((await checkRemoteVersion(store, drive.api, 'P1', { account })).status, SYNC_STATUS.LOCAL_ONLY);
+  await syncProject(store, drive.api, 'P1', { account });
+  const id = (await store.getProjectMeta('P1')).driveLink.fileId;
+  assert.equal((await checkRemoteVersion(store, drive.api, 'P1', { account })).status, SYNC_STATUS.SYNCED);
+  drive.touchRemote(id, serializeProjectToPrg(project('P1', { name: 'nuvem' })));
+  drive.calls.length = 0;
+  const newer = await checkRemoteVersion(store, drive.api, 'P1', { account });
+  assert.equal(newer.status, SYNC_STATUS.REMOTE_NEWER);
+  assert.deepEqual(drive.calls, ['getMeta'], 'nada é baixado nem enviado');
+  await store.saveProject(project('P1', { name: 'local novo' }));
+  assert.equal((await checkRemoteVersion(store, drive.api, 'P1', { account })).status, SYNC_STATUS.CONFLICT);
+  drive.files.get(id).trashed = true;
+  assert.equal((await checkRemoteVersion(store, drive.api, 'P1', { account })).status, SYNC_STATUS.REMOTE_MISSING);
+});
+
+test('ao abrir: checkRemoteVersion respeita conta diferente e falhas do Drive sem lançar', async () => {
+  const store = makeStore(); const drive = fakeDrive();
+  await store.createProject(project('P1'));
+  await syncProject(store, drive.api, 'P1', { account });
+  const other = { email: 'outra@escola.com', permissionId: 'perm-2' };
+  assert.equal((await checkRemoteVersion(store, drive.api, 'P1', { account: other })).reason, 'account-mismatch');
+  drive.fail.next = new DriveError('auth', 'token expirado', 401);
+  const failed = await checkRemoteVersion(store, drive.api, 'P1', { account });
+  assert.equal(failed.error, 'auth');
+  assert.equal(failed.status, SYNC_STATUS.RECONNECT);
 });
 
 test('conflito: manter local envia e cria backup; usar Drive faz backup do local antes de substituir', async () => {

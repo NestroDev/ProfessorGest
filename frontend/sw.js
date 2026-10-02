@@ -1,4 +1,4 @@
-const CACHE_NAME = 'professorgest-shell-v66-projects';
+const CACHE_NAME = 'professorgest-shell-v70-palette';
 const APP_SHELL = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const APP_SHELL = [
   './app.js',
   './api-config.js',
   './src/prof-model.js',
+  './src/grade-recommendation.js',
   './src/project-store.js',
   './src/prg-transfer.js',
   './src/drive-sync.js',
@@ -33,11 +34,11 @@ const APP_SHELL = [
   './vendor/pdfjs/pdf.mjs',
   './vendor/pdfjs/pdf.worker.mjs',
   './google-drive-config.js',
-  './logo.svg?v=21',
-  './manifest.webmanifest?v=21',
-  './icon-192.png?v=21',
-  './icon-512.png?v=21',
-  './icon-512-maskable.png?v=21',
+  './logo.svg?v=25',
+  './manifest.webmanifest?v=25',
+  './icon-192.png?v=25',
+  './icon-512.png?v=25',
+  './icon-512-maskable.png?v=25',
   './privacidade.html',
   './termos.html'
 ];

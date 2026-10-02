@@ -1,3 +1,5 @@
+import { OCCURRENCE_TYPE_KEYS, normalizeGradeSettings } from './grade-recommendation.js';
+
 export const PRG_FORMAT = 'professorgest-prg';
 export const PRG_VERSION = 1;
 export const SAFE_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
@@ -13,15 +15,6 @@ export const MAX_ASSIGNMENTS = 2000;
 export const MAX_ENROLLMENTS = 20000;
 export const MAX_TEXT_LENGTH = 20000;
 export const PRG_MIME = 'application/vnd.professorgest.prg';
-
-const OCCURRENCE_TYPES = new Set([
-  'nao_atividade',
-  'conversou',
-  'faltou',
-  'participou',
-  'bom_comportamento',
-  'observacao',
-]);
 
 const PROJECT_COLLECTIONS = [
   'classes',
@@ -344,7 +337,7 @@ export function validateProjectData(input) {
         assignmentId:
           assignmentId && assignmentIds.has(assignmentId) ? assignmentId : null,
         date: String(occurrence.date || ''),
-        type: OCCURRENCE_TYPES.has(occurrence?.type)
+        type: OCCURRENCE_TYPE_KEYS.has(occurrence?.type)
           ? occurrence.type
           : 'observacao',
         description: textField(occurrence?.description),
@@ -422,6 +415,9 @@ export function validateProjectData(input) {
     activities: safeActivities,
     occurrences: safeOccurrences,
     plans: safePlans,
+    ...(data.gradeSettings && typeof data.gradeSettings === 'object'
+      ? { gradeSettings: normalizeGradeSettings(data.gradeSettings) }
+      : {}),
   };
 
   return {

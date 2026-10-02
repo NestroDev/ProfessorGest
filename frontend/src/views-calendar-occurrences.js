@@ -70,6 +70,8 @@ export function createCalendarOccurrenceRenderers(deps) {
     let list = [...getState().occurrences];
     if (ctx.occClassFilter) { const ids = new Set(studentsOf(ctx.occClassFilter).map(s => s.id)); list = list.filter(o => ids.has(o.studentId)); }
     if (ctx.occTypeFilter) list = list.filter(o => o.type === ctx.occTypeFilter);
+    const polarityOf = o => occurrenceTypes.find(t => t.key === o.type)?.polarity || 'neutra';
+    if (ctx.occPolarityFilter) list = list.filter(o => polarityOf(o) === ctx.occPolarityFilter);
     if (ctx.occMonth) list = list.filter(o => o.date.slice(0, 7) === ctx.occMonth);
     const term = String(ctx.occSearch || '').trim().toLocaleLowerCase('pt-BR');
     if (term) {
@@ -84,11 +86,12 @@ export function createCalendarOccurrenceRenderers(deps) {
     list.sort((a, b) => b.date.localeCompare(a.date));
 
     return `
-      <div class="page-head"><div><h1>Ocorrências</h1><div class="page-sub">${list.length} ${list.length === 1 ? 'registro' : 'registros'}</div></div>
+      <div class="page-head"><div><h1>Registros</h1><div class="page-sub">${list.length} ${list.length === 1 ? 'registro' : 'registros'} · <span class="polarity-count positive">${list.filter(o => polarityOf(o) === 'positiva').length} positivos</span> · <span class="polarity-count negative">${list.filter(o => polarityOf(o) === 'negativa').length} negativos</span></div></div>
         <div class="page-actions"><button type="button" class="btn-primary" id="btnQuickRegisterOcc">${ICONS.plus} Registrar</button></div>
       </div>
       <div class="filter-bar filter-bar-clean">
-        ${searchFieldHTML('occSearchInput', 'Pesquisar aluno ou registro...', ctx.occSearch || '')}
+        ${searchFieldHTML('occSearchInput', 'Pesquisar aluno ou registro…', ctx.occSearch || '')}
+        <div class="chip-toggle-group" role="group" aria-label="Filtrar por tipo de registro">${[{ key: '', label: 'Todos' }, { key: 'positiva', label: 'Positivos' }, { key: 'negativa', label: 'Negativos' }].map(f => `<button type="button" class="chip-toggle ${(ctx.occPolarityFilter || '') === f.key ? 'active' : ''}" data-occ-polarity="${f.key}" aria-pressed="${(ctx.occPolarityFilter || '') === f.key}">${f.label}</button>`).join('')}</div>
         <select class="form-select filter-select" id="occClassFilterSelect"><option value="">Todas as turmas</option>
           ${getState().classes.map(c => `<option value="${esc(c.id)}" ${ctx.occClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
         <select class="form-select filter-select" id="occTypeFilterSelect"><option value="">Todos os tipos</option>
@@ -98,10 +101,10 @@ export function createCalendarOccurrenceRenderers(deps) {
         <div class="list-item-main" data-open-student="${esc(o.studentId)}">
           <div class="avatar sm">${s ? initials(s.name) : '—'}</div>
           <div><div class="list-item-title">${esc(s ? s.name : 'Aluno removido')}</div>
-          <div class="list-item-sub">${fmtDate(o.date)} · ${esc(classNameOf(s ? s.classId : null))}${o.assignmentId ? ` · ${esc(assignmentNameOf(o.assignmentId))}` : ''} · ${badgeFor(o.type)} ${o.description ? '· ' + esc(o.description) : ''}</div></div>
+          <div class="list-item-sub">${fmtDate(o.date)} · ${esc(classNameOf(s ? s.classId : null))}${o.assignmentId ? ` · ${esc(assignmentNameOf(o.assignmentId))}` : ''} ${badgeFor(o.type)} ${o.description ? esc(o.description) : ''}</div></div>
         </div>
         <div class="list-item-actions"><button type="button" class="btn-icon" data-edit-occ="${esc(o.id)}" aria-label="Editar">${ICONS.edit}</button>
-        <button type="button" class="btn-icon danger" data-del-occ="${esc(o.id)}" aria-label="Excluir">${ICONS.trash}</button></div></div>`; }).join('') || emptyState('Nenhuma ocorrência encontrada para este filtro.')}</div>
+        <button type="button" class="btn-icon danger" data-del-occ="${esc(o.id)}" aria-label="Excluir">${ICONS.trash}</button></div></div>`; }).join('') || emptyState('Nenhum registro encontrado para este filtro.')}</div>
     `;
   }
 

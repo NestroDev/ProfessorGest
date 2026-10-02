@@ -53,7 +53,7 @@ export function relativeTime(iso, { now = Date.now(), fallback = v => v } = {}) 
   return fallback(iso);
 }
 
-export function projectCardHTML(entry, { esc, ICONS = {}, formatTime = v => v, status = SYNC_STATUS.LOCAL_ONLY, hasRecovery = false, busy = false, latest = false, now = Date.now() } = {}) {
+export function projectCardHTML(entry, { esc, ICONS = {}, formatTime = v => v, status = SYNC_STATUS.LOCAL_ONLY, hasRecovery = false, busy = false, latest = false, variant = 'row', now = Date.now() } = {}) {
   const isDriveOnly = entry.kind === 'drive-only';
   const name = esc(entryName(entry));
   const tone = statusTone(status);
@@ -61,7 +61,6 @@ export function projectCardHTML(entry, { esc, ICONS = {}, formatTime = v => v, s
   const fileId = esc(entry.remote?.id || '');
   const when = relativeTime(isDriveOnly ? entry.remote?.modifiedTime : entry.meta.updatedAt, { now, fallback: formatTime });
   const badges = [];
-  if (latest) badges.push('<span class="project-badge latest">Mais recente</span>');
   if (entry.kind === 'local+drive') badges.push('<span class="project-badge drive">Google Drive</span>');
   if (hasRecovery) badges.push('<span class="project-badge recovery">Recuperação disponível</span>');
 
@@ -69,48 +68,74 @@ export function projectCardHTML(entry, { esc, ICONS = {}, formatTime = v => v, s
   if (isDriveOnly) stats = `<span>Atualizado ${esc(when)}</span>`;
   else if (!entry.meta.classCount && !entry.meta.studentCount) stats = `<span>Projeto vazio</span><span>Atualizado ${esc(when)}</span>`;
   else stats = `<span>${plural(entry.meta.classCount || 0, 'turma', 'turmas')}</span><span>${plural(entry.meta.studentCount || 0, 'aluno', 'alunos')}</span><span>Atualizado ${esc(when)}</span>`;
-  const teacher = !isDriveOnly && entry.meta.teacherName ? `<div class="project-teacher">${esc(entry.meta.teacherName)}</div>` : '';
+  const teacher = !isDriveOnly && entry.meta.teacherName ? `<span class="project-teacher">${esc(entry.meta.teacherName)}</span>` : '';
   const statusText = isDriveOnly ? syncLabel(SYNC_STATUS.DRIVE_ONLY) : (entry.kind === 'local' && status === SYNC_STATUS.LOCAL_ONLY ? 'Salvo neste dispositivo' : syncLabel(status));
   const statusTone_ = isDriveOnly ? 'info' : (entry.kind === 'local' && status === SYNC_STATUS.LOCAL_ONLY ? 'ok' : tone);
-  const statusLine = `<div class="project-sync tone-${statusTone_}"><span class="status-dot"></span>${esc(statusText)}</div>`;
+  const statusLine = `<span class="project-sync tone-${statusTone_}"><span class="status-dot"></span>${esc(statusText)}</span>`;
   const icon = isDriveOnly ? (ICONS.cloud || '') : (ICONS.folder || ICONS.file || '');
-  const body = `<span class="project-card-icon" aria-hidden="true">${icon}</span>
-        <span class="project-card-copy">
-          <span class="project-name">${name}</span>
-          ${teacher}
-          <span class="project-stats">${stats}</span>
-          ${badges.length ? `<span class="project-badges">${badges.join('')}</span>` : ''}
-          ${statusLine}
-        </span>`;
+  const more = `<button type="button" class="btn-ghost btn-sm project-more" data-project-actions="${id}" aria-label="Mais ações do projeto ${name}" aria-haspopup="dialog" title="Mais ações">${ICONS.more || '⋯'}</button>`;
 
   if (isDriveOnly) {
-    return `<article class="project-card is-drive-only" data-project-card="${fileId}">
-      <div class="project-card-main">${body}</div>
-      <div class="project-card-actions"><button type="button" class="btn-primary btn-sm" data-add-drive-project="${fileId}" ${busy ? 'disabled' : ''}>${ICONS.cloud || ''} Adicionar a este dispositivo</button></div>
+    return `<article class="project-card project-row is-drive-only" data-project-card="${fileId}">
+      <div class="project-card-main">
+        <span class="project-card-icon" aria-hidden="true">${icon}</span>
+        <span class="project-card-copy"><span class="project-name">${name}</span><span class="project-stats">${stats}</span></span>
+        ${statusLine}
+      </div>
+      <button type="button" class="btn-secondary btn-sm" data-add-drive-project="${fileId}" ${busy ? 'disabled' : ''}>${ICONS.cloud || ''} Adicionar a este dispositivo</button>
     </article>`;
   }
-  return `<article class="project-card${latest ? ' is-latest' : ''}" data-project-card="${id}">
-      <button type="button" class="project-card-main project-open" data-open-project="${id}" aria-label="Abrir projeto ${name}">${body}<span class="project-chevron" aria-hidden="true">›</span></button>
-      <button type="button" class="btn-ghost btn-sm project-more" data-project-actions="${id}" aria-label="Mais ações do projeto ${name}" aria-haspopup="dialog" title="Mais ações">${ICONS.more || '⋯'}</button>
+
+  if (variant === 'feature') {
+    return `<article class="project-card project-feature" data-project-card="${id}">
+      <button type="button" class="project-card-main project-open" data-open-project="${id}" aria-label="Abrir projeto ${name}">
+        ${latest ? '<span class="project-feature-label">Mais recente</span>' : '<span class="project-feature-label">Seu projeto</span>'}
+        <span class="project-name">${name}</span>
+        ${teacher}
+        <span class="project-stats">${stats}</span>
+        <span class="project-feature-foot">
+          ${statusLine}
+          ${badges.length ? `<span class="project-badges">${badges.join('')}</span>` : ''}
+          <span class="project-feature-open">Abrir projeto <span aria-hidden="true">→</span></span>
+        </span>
+      </button>
+      ${more}
+    </article>`;
+  }
+
+  return `<article class="project-card project-row" data-project-card="${id}">
+      <button type="button" class="project-card-main project-open" data-open-project="${id}" aria-label="Abrir projeto ${name}">
+        <span class="project-card-icon" aria-hidden="true">${icon}</span>
+        <span class="project-card-copy">
+          <span class="project-name">${name}</span>
+          <span class="project-stats">${stats}</span>
+        </span>
+        ${badges.length ? `<span class="project-badges">${badges.join('')}</span>` : ''}
+        ${statusLine}
+        <span class="project-chevron" aria-hidden="true">›</span>
+      </button>
+      ${more}
     </article>`;
 }
 
-/** Estado vazio guiado: três caminhos claros, com o DED+ visível. */
+/** Estado vazio guiado: dois caminhos principais (DED+ primeiro) e atalhos discretos. */
 export function startCardsHTML({ ICONS = {}, esc = v => v } = {}) {
   const card = (key, title, text, icon, primary = false, badge = '') => `
     <button type="button" class="start-card${primary ? ' primary' : ''}" data-start="${key}">
       <span class="start-card-icon" aria-hidden="true">${icon}</span>
       <span class="start-card-copy"><strong>${esc(title)}${badge ? `<em>${esc(badge)}</em>` : ''}</strong><small>${esc(text)}</small></span>
-      <span class="start-card-arrow" aria-hidden="true">›</span>
+      <span class="start-card-arrow" aria-hidden="true">→</span>
     </button>`;
   return `<div class="start-panel">
-    <div class="start-panel-head"><strong>Como você quer começar?</strong><span>Escolha uma opção. Você pode mudar tudo depois.</span></div>
+    <h2 class="start-title">Como você quer começar?</h2>
     <div class="start-grid">
-      ${card('ded', 'Importar do DED+', 'Selecione os PDFs das suas turmas e o projeto já nasce com turmas e alunos.', ICONS.refresh || '', true, 'Mais rápido')}
+      ${card('ded', 'Importar do DED+', 'Envie os PDFs das suas turmas e o projeto já nasce com turmas e alunos.', ICONS.refresh || '', true, 'Mais rápido')}
       ${card('blank', 'Projeto em branco', 'Comece do zero e cadastre turmas e alunos manualmente.', ICONS.plus || '')}
-      ${card('import', 'Abrir um arquivo .prg', 'Traga um projeto exportado antes, de outro aparelho ou de um backup.', ICONS.folder || '')}
     </div>
-    <button type="button" class="start-demo" data-start="demo">Só quero ver como funciona — abrir a demonstração</button>
+    <div class="start-links">
+      <button type="button" class="start-link" data-start="import">${ICONS.folder || ''} Abrir um arquivo de projeto</button>
+      <button type="button" class="start-link" data-start="demo">${ICONS.sparkle || ''} Ver a demonstração</button>
+    </div>
   </div>`;
 }
 
@@ -119,7 +144,7 @@ export function projectsListHTML(entries, ctx) {
   const filtered = filterEntries(entries, query);
   const { local, driveOnly } = splitEntries(filtered);
   const latestId = local.length > 1 && !query ? local[0].projectId : null;
-  const card = e => projectCardHTML(e, { ...ctx, status: e.kind === 'drive-only' ? SYNC_STATUS.DRIVE_ONLY : statusFor(e), hasRecovery: recoveryIds.has(e.projectId), latest: e.projectId === latestId && e.kind !== 'drive-only' });
+  const card = (e, variant = 'row') => projectCardHTML(e, { ...ctx, variant, status: e.kind === 'drive-only' ? SYNC_STATUS.DRIVE_ONLY : statusFor(e), hasRecovery: recoveryIds.has(e.projectId), latest: e.projectId === latestId && e.kind !== 'drive-only' });
   const total = splitEntries(entries).local.length;
 
   let html = '';
@@ -127,12 +152,19 @@ export function projectsListHTML(entries, ctx) {
     html += startCardsHTML({ ICONS: ctx.ICONS, esc });
   } else if (!local.length && query) {
     html += `<div class="projects-empty"><strong>Nenhum projeto encontrado.</strong><span>Tente outro termo de busca.</span></div>`;
-  } else {
-    html += `<div class="projects-grid">${local.map(card).join('')}</div>`;
+  } else if (query) {
+    html += `<div class="project-rows">${local.map(e => card(e)).join('')}</div>`;
+  } else if (local.length) {
+    const [first, ...rest] = local;
+    html += card(first, 'feature');
+    if (rest.length) {
+      html += `<div class="projects-section-title">Outros projetos <small>${rest.length}</small></div>
+        <div class="project-rows">${rest.map(e => card(e)).join('')}</div>`;
+    }
   }
   if (driveOnly.length) {
     html += `<div class="projects-section-title">Somente no Google Drive <small>${plural(driveOnly.length, 'projeto', 'projetos')}</small></div>
-      <div class="projects-grid">${driveOnly.map(card).join('')}</div>`;
+      <div class="project-rows">${driveOnly.map(e => card(e)).join('')}</div>`;
   }
   if (driveListing?.message) {
     html += `<div class="projects-note tone-${esc(driveListing.tone || 'neutral')}">${esc(driveListing.message)}</div>`;

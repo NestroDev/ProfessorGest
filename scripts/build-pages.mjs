@@ -30,6 +30,7 @@ const files = [
 
 const modules = [
   'prof-model.js',
+  'grade-recommendation.js',
   'project-store.js',
   'prg-transfer.js',
   'drive-sync.js',

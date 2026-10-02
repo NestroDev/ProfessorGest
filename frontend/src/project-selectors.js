@@ -192,3 +192,20 @@ export function activityStatus(
 ) {
   return activity?.dueDate < todayISO() ? 'atrasada' : 'proxima';
 }
+
+/** Escolas sem nenhuma turma vinculada (inclusive arquivadas), pelo mesmo critério da tela de escolas. */
+export function emptySchoolIds(state) {
+  const schools = Array.isArray(state?.schools) ? state.schools : [];
+  const classes = Array.isArray(state?.classes) ? state.classes : [];
+
+  return schools
+    .filter(
+      school =>
+        !classes.some(
+          classroom =>
+            classroom.schoolId === school.id ||
+            classroom?.ded?.schoolName === school.name,
+        ),
+    )
+    .map(school => school.id);
+}

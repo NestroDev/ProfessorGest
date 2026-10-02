@@ -1,7 +1,8 @@
 export function createStudentActivityRenderers(deps) {
   const {
     getState, getCtx, esc, initials, classNameOf, studentStats, activityStats, activityStatus,
-    occurrencesOf, activitiesOf, assignmentNameOf = () => '', emptyState, fmtDate, monthLabel, badgeFor, ICONS, searchFieldHTML
+    occurrencesOf, activitiesOf, assignmentNameOf = () => '', emptyState, fmtDate, monthLabel, badgeFor, ICONS, searchFieldHTML,
+    studentGrade = null, formatGrade = value => String(value)
   } = deps;
 
   function filteredSortedStudents() {
@@ -52,7 +53,7 @@ export function createStudentActivityRenderers(deps) {
         <div class="page-actions"><button type="button" class="btn-secondary" id="btnToggleStudentBulk">${bulk ? 'Cancelar seleção' : 'Selecionar vários'}</button><button type="button" class="btn-primary" id="btnNewStudent">${ICONS.plus} Adicionar aluno</button></div>
       </div>
       <div class="filter-bar filter-bar-clean">
-        ${searchFieldHTML('studentSearchInput', 'Pesquisar aluno...', getCtx().studentSearch || '')}
+        ${searchFieldHTML('studentSearchInput', 'Pesquisar aluno…', getCtx().studentSearch || '')}
         <select class="form-select" id="studentClassFilterSelect"><option value="">Todas as turmas</option>${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().studentClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
         <select class="form-select" id="studentSortSelect"><option value="nome" ${getCtx().studentSort === 'nome' ? 'selected' : ''}>Nome</option><option value="turma" ${getCtx().studentSort === 'turma' ? 'selected' : ''}>Turma</option><option value="registros" ${getCtx().studentSort === 'registros' ? 'selected' : ''}>Mais acompanhados</option></select>
       </div>
@@ -83,6 +84,7 @@ export function createStudentActivityRenderers(deps) {
     const s = getState().students.find(x => x.id === getCtx().studentId);
     if (!s) return emptyState('Aluno não encontrado.');
     const stats = studentStats(s);
+    const grade = studentGrade ? studentGrade(s.id, { classId: s.classId || '' }) : null;
     const tab = getCtx().studentTab || 'visao';
     const tabs = [{ key: 'visao', label: 'Visão geral' }, { key: 'historico', label: 'Histórico' }, { key: 'atividades', label: 'Atividades' }, { key: 'observacoes', label: 'Observações' }, { key: 'relatorio', label: 'Relatório' }];
     let body = '';
@@ -105,7 +107,7 @@ export function createStudentActivityRenderers(deps) {
       body = `<div class="card narrow-card"><p class="muted">Gere um relatório individual com dados de acompanhamento, ocorrências, observações e atividades do período.</p><button type="button" class="btn-primary btn-block" id="btnGoStudentReport">${ICONS.report} Gerar relatório individual</button></div>`;
     }
 
-    return `<button type="button" class="btn-ghost btn-sm page-back" id="btnBack">${ICONS.back} Voltar</button><div class="profile-header student-profile-header"><div class="avatar lg">${initials(s.name)}</div><div class="profile-header-main"><div class="list-item-title profile-student-name">${esc(s.name)}</div><div class="list-item-sub">${esc(classNameOf(s.classId))}</div></div><div class="profile-actions"><button type="button" class="btn-primary btn-sm" id="btnRegisterForStudent">${ICONS.plus} Registrar ocorrência</button><button type="button" class="btn-secondary btn-sm" id="btnStudentActions">Mais ações</button></div></div><div class="stat-row profile-stats"><div class="card stat-card"><div class="stat-value">${stats.activityCount}</div><div class="stat-label">Atividades</div></div><div class="card stat-card"><div class="stat-value">${stats.occurrenceCount}</div><div class="stat-label">Ocorrências</div></div><div class="card stat-card"><div class="stat-value">${stats.observationCount}</div><div class="stat-label">Observações</div></div></div><div class="tabs responsive-tabs">${tabs.map(t => `<button type="button" class="tab ${tab === t.key ? 'active' : ''}" data-student-tab="${esc(t.key)}">${t.label}</button>`).join('')}</div>${body}`;
+    return `<button type="button" class="btn-ghost btn-sm page-back" id="btnBack">${ICONS.back} Voltar</button><div class="profile-header student-profile-header"><div class="avatar lg">${initials(s.name)}</div><div class="profile-header-main"><div class="list-item-title profile-student-name">${esc(s.name)}</div><div class="list-item-sub">${esc(classNameOf(s.classId))}</div></div><div class="profile-actions"><button type="button" class="btn-primary btn-sm" id="btnRegisterForStudent">${ICONS.plus} Registrar ocorrência</button><button type="button" class="btn-secondary btn-sm" id="btnStudentActions">Mais ações</button></div></div><div class="stat-row profile-stats"><div class="card stat-card"><div class="stat-value">${stats.activityCount}</div><div class="stat-label">Atividades</div></div><div class="card stat-card"><div class="stat-value">${stats.occurrenceCount}</div><div class="stat-label">Registros</div></div><div class="card stat-card"><div class="stat-value">${stats.observationCount}</div><div class="stat-label">Observações</div></div>${grade ? `<div class="card stat-card" title="${esc(`${grade.positive} positivas · ${grade.negative} negativas. Calculada a partir dos registros desta turma e dos registros sem turma.`)}"><div class="stat-value">${esc(formatGrade(grade.grade))}<small> / ${esc(formatGrade(grade.max))}</small></div><div class="stat-label">Nota recomendada</div></div>` : ''}</div><div class="tabs responsive-tabs">${tabs.map(t => `<button type="button" class="tab ${tab === t.key ? 'active' : ''}" data-student-tab="${esc(t.key)}">${t.label}</button>`).join('')}</div>${body}`;
   }
 
   function activityListItemHTML(a) {
@@ -126,7 +128,7 @@ export function createStudentActivityRenderers(deps) {
 
   function renderAtividades() {
     const filters = [{ key: 'proximas', label: 'Próximas' }, { key: 'atrasadas', label: 'Atrasadas' }, { key: 'todas', label: 'Todas' }];
-    return `<div class="page-head"><div><h1>Atividades</h1><div class="page-sub">Planeje o que precisa acontecer, sem controlar entregas aluno a aluno.</div></div><div class="page-actions"><button type="button" class="btn-primary" id="btnNewActivity">${ICONS.plus} Nova atividade</button></div></div><div class="filter-bar filter-bar-clean">${searchFieldHTML('activitySearchInput', 'Pesquisar atividade...', getCtx().activitySearch || '')}<div class="chip-toggle-group">${filters.map(f => `<button type="button" class="chip-toggle ${getCtx().activityFilter === f.key ? 'active' : ''}" data-activity-filter="${f.key}">${f.label}</button>`).join('')}</div><select class="form-select" id="activityClassFilterSelect"><option value="">Todas as turmas</option>${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().activityClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="card list-card">${filteredActivities().map(activityListItemHTML).join('') || emptyState('Nenhuma atividade encontrada.')}</div>`;
+    return `<div class="page-head"><div><h1>Atividades</h1><div class="page-sub">Planeje o que precisa acontecer, sem controlar entregas aluno a aluno.</div></div><div class="page-actions"><button type="button" class="btn-primary" id="btnNewActivity">${ICONS.plus} Nova atividade</button></div></div><div class="filter-bar filter-bar-clean">${searchFieldHTML('activitySearchInput', 'Pesquisar atividade…', getCtx().activitySearch || '')}<div class="chip-toggle-group">${filters.map(f => `<button type="button" class="chip-toggle ${getCtx().activityFilter === f.key ? 'active' : ''}" data-activity-filter="${f.key}">${f.label}</button>`).join('')}</div><select class="form-select" id="activityClassFilterSelect"><option value="">Todas as turmas</option>${getState().classes.map(c => `<option value="${esc(c.id)}" ${getCtx().activityClassFilter === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="card list-card">${filteredActivities().map(activityListItemHTML).join('') || emptyState('Nenhuma atividade encontrada.')}</div>`;
   }
 
   function renderAtividadeDetail() {

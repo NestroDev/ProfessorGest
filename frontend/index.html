@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#2563EB">
+<meta name="theme-color" content="#DFE4EB">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="application-name" content="ProfessorGest">
 <link rel="manifest" href="./manifest.webmanifest">
-<link rel="apple-touch-icon" href="./icon-192.png?v=21">
+<link rel="apple-touch-icon" href="./icon-192.png?v=25">
 <title>ProfessorGest</title>
-<link rel="icon" type="image/svg+xml" href="logo.svg?v=21">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=21">
+<link rel="icon" type="image/svg+xml" href="logo.svg?v=25">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=25">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>
   // Define o tema antes da primeira pintura para evitar o "flash" de tema claro/escuro.
   (() => {
@@ -40,7 +40,7 @@
   <div class="app-boot-glow app-boot-glow-two"></div>
   <div class="app-boot-content">
     <div class="app-boot-mark">
-      <img src="logo.svg?v=21" alt="" width="52" height="52">
+      <img src="logo.svg?v=25" alt="" width="52" height="52">
     </div>
     <div class="app-boot-brand">ProfessorGest</div>
     <div class="app-boot-subtitle">gestão pedagógica</div>
@@ -54,25 +54,21 @@
 </script>
 
 <div class="welcome-screen" id="welcomeScreen">
-  <div class="welcome-orb orb-one"></div>
-  <div class="welcome-orb orb-two"></div>
-  <header class="welcome-topbar">
+  <header class="welcome-topbar launcher-bar">
     <div class="welcome-brand">
-      <img src="logo.svg?v=21" alt="ProfessorGest" class="welcome-logo">
-      <div>
-        <div class="welcome-brand-name">ProfessorGest</div>
-        <div class="welcome-brand-sub">gestão pedagógica</div>
-      </div>
+      <img src="logo.svg?v=25" alt="" class="welcome-logo">
+      <div class="welcome-brand-name">ProfessorGest</div>
     </div>
     <div class="welcome-topbar-actions">
-            <button class="welcome-theme-toggle" id="welcomeThemeToggle" type="button" aria-label="Alternar tema">
+      <button class="launcher-icon-button" id="welcomeSettings" type="button" aria-label="Configurações" title="Configurações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.1 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      <button class="welcome-theme-toggle" id="welcomeThemeToggle" type="button" aria-label="Alternar tema">
         <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span>
         <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2z"/></svg></span>
       </button>
     </div>
   </header>
 
-  <main class="welcome-content welcome-projects">
+  <main class="welcome-content welcome-projects launcher">
     <div class="welcome-projects-head">
       <div>
         <h1>Seus projetos</h1>
@@ -80,7 +76,7 @@
       </div>
       <div class="welcome-projects-actions">
         <button class="btn-primary" id="welcomeNewProject" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Novo projeto</button>
-        <button class="btn-secondary" id="welcomeImportPrg" type="button">Importar .prg</button>
+        <button class="btn-secondary" id="welcomeImportPrg" type="button">Abrir arquivo</button>
       </div>
     </div>
 
@@ -91,31 +87,14 @@
     <div class="projects-list" id="projectsList" aria-live="polite"></div>
 
     <section class="cloud-panel" id="cloudPanel" aria-label="Google Drive" hidden></section>
-
-    <footer class="welcome-footer">
-      <div class="welcome-secondary-row">
-        <button class="welcome-secondary-action" id="welcomeDemo" type="button">
-          <span class="welcome-secondary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg></span>
-          <span>Ver demonstração</span>
-        </button>
-        <button class="welcome-secondary-action" id="welcomeSettings" type="button">
-          <span class="welcome-secondary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.1 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
-          <span>Configurações</span>
-        </button>
-        <button class="welcome-secondary-action is-hidden" id="welcomeInstall" type="button">
-          <span class="welcome-secondary-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 4v10.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
-              <path d="m8.25 11.25 3.75 3.75 3.75-3.75" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M5 18.5h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
-            </svg>
-          </span>
-          <span>Instalar</span>
-        </button>
-      </div>
-      <div class="welcome-legal"><span class="welcome-legal-links"><a href="./privacidade.html">Privacidade</a><a href="./termos.html">Termos</a></span></div>
-    </footer>
   </main>
+
+  <footer class="welcome-footer launcher-footer">
+    <button class="launcher-link" id="welcomeDemo" type="button">Ver demonstração</button>
+    <button class="launcher-link is-hidden" id="welcomeInstall" type="button">Instalar o app</button>
+    <a class="launcher-link" href="./privacidade.html">Privacidade</a>
+    <a class="launcher-link" href="./termos.html">Termos</a>
+  </footer>
 </div>
 
 <div class="setup-screen is-hidden" id="setupScreen">
@@ -123,7 +102,7 @@
   <div class="setup-orb setup-orb-two"></div>
   <header class="setup-topbar">
     <div class="welcome-brand">
-      <img src="logo.svg?v=21" alt="ProfessorGest" class="welcome-logo">
+      <img src="logo.svg?v=25" alt="ProfessorGest" class="welcome-logo">
       <div>
         <div class="welcome-brand-name">ProfessorGest</div>
         <div class="welcome-brand-sub">novo projeto</div>
@@ -155,7 +134,7 @@
         <div class="form-group">
           <label class="form-label" for="setupProjectName">Nome do projeto</label>
           <input class="form-input setup-input" id="setupProjectName" name="projectName" autocomplete="off" placeholder="Ex.: Matemática — 2026">
-          <p class="form-hint">Você pode mudar depois. O nome do arquivo .prg é gerado a partir dele.</p>
+          <p class="form-hint">Você pode mudar depois.</p>
         </div>
         <div class="setup-actions">
           <button type="button" class="btn-secondary" id="setupBackBtn">Voltar</button>
@@ -180,14 +159,14 @@
   <!-- Sidebar (desktop) -->
   <aside class="sidebar">
     <div class="brand">
-      <img class="brand-logo" src="logo.svg?v=21" alt="">
+      <img class="brand-logo" src="logo.svg?v=25" alt="">
       <div class="brand-copy">
         <span class="brand-name">ProfessorGest</span>
         <span class="brand-tagline">gestão pedagógica</span>
       </div>
     </div>
     <div class="nav-scroll" id="sidebar-nav"></div>
-    <button class="btn-primary quick-register" id="quickRegisterBtnDesktop">+ Registrar ocorrência</button>
+    <button class="btn-primary quick-register" id="quickRegisterBtnDesktop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Registrar ocorrência</button>
   </aside>
 
   <!-- Main -->
@@ -229,7 +208,7 @@
   <nav class="bottom-nav" id="bottomNav"></nav>
 
   <!-- Floating quick register button (mobile) -->
-  <button class="fab" id="quickRegisterBtnMobile" title="Registrar ocorrência" aria-label="Registrar ocorrência">+</button>
+  <button class="fab" id="quickRegisterBtnMobile" title="Registrar ocorrência" aria-label="Registrar ocorrência"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 
 </div>
 

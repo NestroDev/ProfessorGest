@@ -3,7 +3,7 @@
  * All contextual searches in ProfessorGest use these classes so the same
  * interaction looks and behaves the same across lists, dialogs and reports.
  */
-export function createSearchField({ id, placeholder = 'Pesquisar...', value = '', ariaLabel = '', extraClass = '' }) {
+export function createSearchField({ id, placeholder = 'Pesquisar…', value = '', ariaLabel = '', extraClass = '' }) {
   const label = ariaLabel || placeholder;
   return `<div class="search-field ${extraClass}" data-search-field="${escapeAttr(id)}">
     <span class="search-field-icon" aria-hidden="true">
