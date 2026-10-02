@@ -1040,7 +1040,7 @@ async function openProjectActions(projectId) {
       </section>
     </div>
     <div class="form-actions"><button type="button" class="btn-secondary" id="modalCancel">Fechar</button></div>
-  `);
+  `, false, 'project-actions-modal');
   const actions = {
     open: () => { closeModal(); openProject(projectId); },
     rename: () => { closeModal(); openRenameProjectModal(projectId); },
